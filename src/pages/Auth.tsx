@@ -33,7 +33,6 @@ export default function Auth() {
     
     if (error) {
       setAuthError(error.message);
-      toast.error(error.message);
     } else {
       navigate("/");
     }
@@ -49,7 +48,6 @@ export default function Auth() {
     
     if (error) {
       setAuthError(error.message);
-      toast.error(error.message);
     } else {
       toast.success("Account created! You can now sign in.");
       navigate("/");
