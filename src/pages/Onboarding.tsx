@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useFacilities } from "@/hooks/useFacilities";
@@ -9,11 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
-import { Shield, Building2, ArrowRight, ArrowLeft, CheckCircle2, Wrench, FlaskConical, HelpCircle } from "lucide-react";
+import { Shield, Building2, ArrowRight, ArrowLeft, CheckCircle2, Wrench, FlaskConical, HelpCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type FacilityType = "automotive" | "chemical" | "other";
+
+// Use string values for all question answers to properly track "not_sure" selections
+type AnswerValue = "yes" | "no" | "not_sure" | "";
 
 interface FacilityData {
   name: string;
@@ -22,22 +25,22 @@ interface FacilityData {
   state: string;
   zip_code: string;
   facility_type: FacilityType | "";
-  // Automotive questions
-  has_hazardous_waste: boolean | null;
+  // Automotive questions - now using string values
+  has_hazardous_waste: AnswerValue;
   waste_shipment_frequency: string;
-  generates_used_oil: boolean | null;
+  generates_used_oil: AnswerValue;
   used_oil_storage_gallons: string;
-  has_parts_washer: boolean | null;
-  parts_washer_vendor_serviced: boolean | null;
-  has_spray_painting: boolean | null;
-  has_underground_tanks: boolean | null;
-  // Chemical questions
-  stores_regulated_chemicals: boolean | null;
+  has_parts_washer: AnswerValue;
+  parts_washer_vendor_serviced: AnswerValue;
+  has_spray_painting: AnswerValue;
+  has_underground_tanks: AnswerValue;
+  // Chemical questions - now using string values
+  stores_regulated_chemicals: AnswerValue;
   sds_count_range: string;
-  has_aboveground_tanks: boolean | null;
-  has_floor_drains: boolean | null;
-  has_air_emissions: boolean | null;
-  generates_hazwaste: boolean | null;
+  has_aboveground_tanks: AnswerValue;
+  has_floor_drains: AnswerValue;
+  has_air_emissions: AnswerValue;
+  generates_hazwaste: AnswerValue;
 }
 
 const automotiveQuestions = [
@@ -125,6 +128,10 @@ export default function Onboarding() {
   const { facilities, loading: facilitiesLoading, refetch } = useFacilities();
   const [step, setStep] = useState(0);
   const [formLoading, setFormLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
+  const [showFormError, setShowFormError] = useState(false);
+  const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  
   const [facilityData, setFacilityData] = useState<FacilityData>({
     name: "",
     address: "",
@@ -132,20 +139,20 @@ export default function Onboarding() {
     state: "",
     zip_code: "",
     facility_type: "",
-    has_hazardous_waste: null,
+    has_hazardous_waste: "",
     waste_shipment_frequency: "",
-    generates_used_oil: null,
+    generates_used_oil: "",
     used_oil_storage_gallons: "",
-    has_parts_washer: null,
-    parts_washer_vendor_serviced: null,
-    has_spray_painting: null,
-    has_underground_tanks: null,
-    stores_regulated_chemicals: null,
+    has_parts_washer: "",
+    parts_washer_vendor_serviced: "",
+    has_spray_painting: "",
+    has_underground_tanks: "",
+    stores_regulated_chemicals: "",
     sds_count_range: "",
-    has_aboveground_tanks: null,
-    has_floor_drains: null,
-    has_air_emissions: null,
-    generates_hazwaste: null,
+    has_aboveground_tanks: "",
+    has_floor_drains: "",
+    has_air_emissions: "",
+    generates_hazwaste: "",
   });
 
   const totalSteps = 3;
@@ -168,12 +175,68 @@ export default function Onboarding() {
     );
   }
 
-  const updateField = (key: keyof FacilityData, value: string | boolean | null) => {
+  const updateField = (key: keyof FacilityData, value: string) => {
     setFacilityData((prev) => ({ ...prev, [key]: value }));
+    // Clear validation error when user answers
+    if (validationErrors[key]) {
+      setValidationErrors((prev) => ({ ...prev, [key]: false }));
+    }
+    if (showFormError) {
+      setShowFormError(false);
+    }
+  };
+
+  // Convert string answer to boolean for database storage
+  const answerToBoolean = (value: AnswerValue): boolean | null => {
+    if (value === "yes") return true;
+    if (value === "no") return false;
+    return null; // "not_sure" or empty
+  };
+
+  const validateStep3 = (): boolean => {
+    if (facilityData.facility_type === "other") return true;
+    
+    const currentQuestions = facilityData.facility_type === "automotive" 
+      ? automotiveQuestions 
+      : chemicalQuestions;
+    
+    const errors: Record<string, boolean> = {};
+    let firstUnansweredKey: string | null = null;
+    
+    for (const q of currentQuestions) {
+      const value = facilityData[q.key as keyof FacilityData] as string;
+      if (!value || value === "") {
+        errors[q.key] = true;
+        if (!firstUnansweredKey) {
+          firstUnansweredKey = q.key;
+        }
+      }
+    }
+    
+    setValidationErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      setShowFormError(true);
+      // Scroll to first unanswered question
+      if (firstUnansweredKey && questionRefs.current[firstUnansweredKey]) {
+        questionRefs.current[firstUnansweredKey]?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }
+      return false;
+    }
+    
+    return true;
   };
 
   const handleSubmit = async () => {
     if (!user) return;
+    
+    // Validate all questions are answered
+    if (!validateStep3()) {
+      return;
+    }
 
     setFormLoading(true);
 
@@ -185,9 +248,9 @@ export default function Onboarding() {
       city: facilityData.city,
       state: facilityData.state,
       zip_code: facilityData.zip_code,
-      has_hazardous_waste: facilityData.has_hazardous_waste ?? false,
-      has_paint_booth: facilityData.has_spray_painting ?? false,
-      has_underground_tanks: facilityData.has_underground_tanks ?? false,
+      has_hazardous_waste: answerToBoolean(facilityData.has_hazardous_waste),
+      has_paint_booth: answerToBoolean(facilityData.has_spray_painting),
+      has_underground_tanks: answerToBoolean(facilityData.has_underground_tanks),
       onboarding_completed: true,
     };
 
@@ -211,64 +274,108 @@ export default function Onboarding() {
     : [];
 
   const renderQuestionInput = (q: typeof automotiveQuestions[0]) => {
-    const value = facilityData[q.key as keyof FacilityData];
+    const value = facilityData[q.key as keyof FacilityData] as string;
+    const hasError = validationErrors[q.key];
     
     if (q.type === "yesNo") {
       return (
-        <RadioGroup
-          value={value === true ? "yes" : value === false ? "no" : ""}
-          onValueChange={(v) => updateField(q.key as keyof FacilityData, v === "yes")}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="yes" id={`${q.key}-yes`} />
-            <Label htmlFor={`${q.key}-yes`} className="cursor-pointer">Yes</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="no" id={`${q.key}-no`} />
-            <Label htmlFor={`${q.key}-no`} className="cursor-pointer">No</Label>
-          </div>
-        </RadioGroup>
+        <>
+          <RadioGroup
+            value={value}
+            onValueChange={(v) => updateField(q.key as keyof FacilityData, v)}
+            className="flex flex-wrap gap-4"
+          >
+            <label 
+              htmlFor={`${q.key}-yes`} 
+              className="flex items-center space-x-2 cursor-pointer p-2 -m-2 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+            >
+              <RadioGroupItem value="yes" id={`${q.key}-yes`} />
+              <span className="text-foreground">Yes</span>
+            </label>
+            <label 
+              htmlFor={`${q.key}-no`} 
+              className="flex items-center space-x-2 cursor-pointer p-2 -m-2 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+            >
+              <RadioGroupItem value="no" id={`${q.key}-no`} />
+              <span className="text-foreground">No</span>
+            </label>
+          </RadioGroup>
+          {hasError && (
+            <p className="text-sm text-destructive flex items-center gap-1 mt-1">
+              <AlertCircle className="h-3 w-3" />
+              Please select an answer (Yes or No).
+            </p>
+          )}
+        </>
       );
     }
 
     if (q.type === "yesNoNotSure") {
       return (
-        <RadioGroup
-          value={value === true ? "yes" : value === false ? "no" : value === null ? "" : "not_sure"}
-          onValueChange={(v) => updateField(q.key as keyof FacilityData, v === "yes" ? true : v === "no" ? false : null)}
-          className="flex gap-4"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="yes" id={`${q.key}-yes`} />
-            <Label htmlFor={`${q.key}-yes`} className="cursor-pointer">Yes</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="no" id={`${q.key}-no`} />
-            <Label htmlFor={`${q.key}-no`} className="cursor-pointer">No</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="not_sure" id={`${q.key}-not-sure`} />
-            <Label htmlFor={`${q.key}-not-sure`} className="cursor-pointer">Not sure</Label>
-          </div>
-        </RadioGroup>
+        <>
+          <RadioGroup
+            value={value}
+            onValueChange={(v) => updateField(q.key as keyof FacilityData, v)}
+            className="flex flex-wrap gap-4"
+          >
+            <label 
+              htmlFor={`${q.key}-yes`} 
+              className="flex items-center space-x-2 cursor-pointer p-2 -m-2 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+            >
+              <RadioGroupItem value="yes" id={`${q.key}-yes`} />
+              <span className="text-foreground">Yes</span>
+            </label>
+            <label 
+              htmlFor={`${q.key}-no`} 
+              className="flex items-center space-x-2 cursor-pointer p-2 -m-2 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+            >
+              <RadioGroupItem value="no" id={`${q.key}-no`} />
+              <span className="text-foreground">No</span>
+            </label>
+            <label 
+              htmlFor={`${q.key}-not_sure`} 
+              className="flex items-center space-x-2 cursor-pointer p-2 -m-2 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+            >
+              <RadioGroupItem value="not_sure" id={`${q.key}-not_sure`} />
+              <span className="text-foreground">Not sure</span>
+            </label>
+          </RadioGroup>
+          {hasError && (
+            <p className="text-sm text-destructive flex items-center gap-1 mt-1">
+              <AlertCircle className="h-3 w-3" />
+              Please select an answer (Yes, No, or Not sure).
+            </p>
+          )}
+        </>
       );
     }
 
     if (q.type === "select" && q.options) {
       return (
-        <RadioGroup
-          value={value as string}
-          onValueChange={(v) => updateField(q.key as keyof FacilityData, v)}
-          className="grid gap-2"
-        >
-          {q.options.map((opt) => (
-            <div key={opt} className="flex items-center space-x-2">
-              <RadioGroupItem value={opt} id={`${q.key}-${opt}`} />
-              <Label htmlFor={`${q.key}-${opt}`} className="cursor-pointer">{opt}</Label>
-            </div>
-          ))}
-        </RadioGroup>
+        <>
+          <RadioGroup
+            value={value}
+            onValueChange={(v) => updateField(q.key as keyof FacilityData, v)}
+            className="grid gap-2"
+          >
+            {q.options.map((opt) => (
+              <label 
+                key={opt} 
+                htmlFor={`${q.key}-${opt}`}
+                className="flex items-center space-x-2 cursor-pointer p-2 -m-2 rounded-md hover:bg-muted/50 active:bg-muted transition-colors"
+              >
+                <RadioGroupItem value={opt} id={`${q.key}-${opt}`} />
+                <span className="text-foreground">{opt}</span>
+              </label>
+            ))}
+          </RadioGroup>
+          {hasError && (
+            <p className="text-sm text-destructive flex items-center gap-1 mt-1">
+              <AlertCircle className="h-3 w-3" />
+              Please select an option.
+            </p>
+          )}
+        </>
       );
     }
 
@@ -502,12 +609,27 @@ export default function Onboarding() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {showFormError && facilityData.facility_type !== "other" && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <p className="text-sm text-destructive font-medium">
+                      Please answer all questions to continue.
+                    </p>
+                  </div>
+                )}
+                
                 {facilityData.facility_type !== "other" && questions.length > 0 && (
                   <div className="space-y-6">
                     {questions.map((q, index) => (
-                      <div key={q.key} className="space-y-3">
+                      <div 
+                        key={q.key} 
+                        ref={(el) => { questionRefs.current[q.key] = el; }}
+                        className={`space-y-3 p-3 -m-3 rounded-lg transition-colors ${
+                          validationErrors[q.key] ? 'bg-destructive/5' : ''
+                        }`}
+                      >
                         <p className="font-medium text-foreground">
-                          {index + 1}. {q.question}
+                          {index + 1}. {q.question} <span className="text-destructive">*</span>
                         </p>
                         {renderQuestionInput(q)}
                       </div>
