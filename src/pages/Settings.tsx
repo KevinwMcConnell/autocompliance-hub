@@ -1,17 +1,21 @@
+import { useState } from "react";
 import { useFacilities } from "@/hooks/useFacilities";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useDemoData } from "@/hooks/useDemoData";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, User, Bell, Shield, Sparkles, Trash2, Wrench } from "lucide-react";
+import { Building2, User, Bell, Shield, Sparkles, Trash2, Wrench, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Settings() {
   const { currentFacility } = useFacilities();
   const { user } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
+  const [clearingData, setClearingData] = useState(false);
   const { demoLoaded, loadDemoData, clearDemoData } = useDemoData();
 
   return (
@@ -149,28 +153,92 @@ export default function Settings() {
               Administrative functions for testing and demo purposes
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-4">
-              <div>
-                <h4 className="text-sm font-medium text-foreground mb-2">Demo Data</h4>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Load sample compliance data to explore app features, or clear it to start fresh.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {!demoLoaded ? (
-                    <Button onClick={loadDemoData} className="gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Load Demo Data
-                    </Button>
-                  ) : (
-                    <Button variant="outline" onClick={clearDemoData} className="gap-2">
-                      <Trash2 className="h-4 w-4" />
-                      Clear Demo Data
-                    </Button>
-                  )}
-                </div>
+          <CardContent className="space-y-6">
+            {/* In-Memory Demo Data */}
+            <div>
+              <h4 className="text-sm font-medium text-foreground mb-2">In-Memory Demo Data</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Load sample compliance data to explore app features, or clear it to start fresh.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {!demoLoaded ? (
+                  <Button onClick={loadDemoData} className="gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Load Demo Data
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={clearDemoData} className="gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    Clear Demo Data
+                  </Button>
+                )}
               </div>
             </div>
+
+            {/* Clear Database Data */}
+            {currentFacility && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  Clear Facility Data
+                </h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Permanently delete all tasks, evidence items, documents, and export packets for "{currentFacility.name}". This cannot be undone.
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (!currentFacility?.id) return;
+                    
+                    const confirmed = window.confirm(
+                      `Are you sure you want to delete ALL data for "${currentFacility.name}"? This includes all tasks, evidence items, documents, and export packets. This action cannot be undone.`
+                    );
+                    
+                    if (!confirmed) return;
+                    
+                    setClearingData(true);
+                    try {
+                      // Delete in order to respect potential foreign keys
+                      const { error: tasksError } = await supabase
+                        .from("tasks")
+                        .delete()
+                        .eq("facility_id", currentFacility.id);
+                      if (tasksError) throw tasksError;
+
+                      const { error: docsError } = await supabase
+                        .from("documents")
+                        .delete()
+                        .eq("facility_id", currentFacility.id);
+                      if (docsError) throw docsError;
+
+                      const { error: evidenceError } = await supabase
+                        .from("evidence_items")
+                        .delete()
+                        .eq("facility_id", currentFacility.id);
+                      if (evidenceError) throw evidenceError;
+
+                      const { error: packetsError } = await supabase
+                        .from("export_packets")
+                        .delete()
+                        .eq("facility_id", currentFacility.id);
+                      if (packetsError) throw packetsError;
+
+                      toast.success("All facility data cleared successfully");
+                    } catch (error: any) {
+                      console.error("Error clearing data:", error);
+                      toast.error(error.message || "Failed to clear data");
+                    } finally {
+                      setClearingData(false);
+                    }
+                  }}
+                  disabled={clearingData}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {clearingData ? "Clearing..." : "Clear All Facility Data"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

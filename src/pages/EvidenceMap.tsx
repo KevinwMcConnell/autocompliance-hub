@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDemoData } from "@/hooks/useDemoData";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, FileText, Calendar, Clock, Info } from "lucide-react";
+import { Search, FileText, Calendar, Clock, Info, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { DemoEvidenceItem } from "@/lib/demoData";
 
@@ -33,7 +34,8 @@ const mockDocuments = [
 ];
 
 export default function EvidenceMap() {
-  const { demoLoaded, evidenceItems, loadDemoData } = useDemoData();
+  const navigate = useNavigate();
+  const { demoLoaded, evidenceItems } = useDemoData();
   const [search, setSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState<DemoEvidenceItem | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
@@ -165,9 +167,13 @@ export default function EvidenceMap() {
           <CardContent className="py-16 text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No evidence items yet</h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mb-6">
               Upload compliance documents to start tracking your requirements.
             </p>
+            <Button onClick={() => navigate("/uploads")} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Go to Upload Inbox
+            </Button>
           </CardContent>
         </Card>
       )}
