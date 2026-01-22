@@ -17,10 +17,9 @@ import {
 import {
   FileText,
   CheckCircle2,
-  Sparkles,
   Upload,
   Eye,
-  Info,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -80,23 +79,7 @@ export default function UploadInbox() {
             Manage and classify uploaded documents
           </p>
         </div>
-        {!demoLoaded && (
-          <Button variant="outline" onClick={loadDemoData} className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            Load Demo Data
-          </Button>
-        )}
       </div>
-
-      {/* Demo data notice */}
-      {demoLoaded && (
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
-          <Info className="h-5 w-5 text-primary mt-0.5" />
-          <p className="text-sm text-muted-foreground">
-            Viewing sample uploaded documents. Approve documents to move them to the processed tab.
-          </p>
-        </div>
-      )}
 
       {/* Upload Zone */}
       <Card>
@@ -245,13 +228,9 @@ export default function UploadInbox() {
           <CardContent className="py-16 text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No documents yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Upload documents or load demo data to see the inbox in action
+            <p className="text-muted-foreground">
+              Upload documents above to start processing.
             </p>
-            <Button onClick={loadDemoData} className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Load Demo Data
-            </Button>
           </CardContent>
         </Card>
       )}

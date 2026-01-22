@@ -13,7 +13,6 @@ import {
   Eye,
   ArrowRight,
   Upload,
-  Info,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -69,18 +68,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Demo data notice */}
-      {demoLoaded && (
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
-          <Info className="h-5 w-5 text-primary mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-foreground">Demo data loaded</p>
-            <p className="text-sm text-muted-foreground">
-              You're viewing sample compliance data. Upload real documents to get started with your actual compliance tracking.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Top Row - Score + Primary Actions */}
       <div className="grid gap-6 lg:grid-cols-3 min-w-0">
@@ -93,12 +80,12 @@ export default function Dashboard() {
           <CardContent className="flex flex-col items-center pt-4">
             <ReadinessScore score={stats?.readinessScore || 0} />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              {demoLoaded ? (
+              {stats ? (
                 <>
-                  {stats?.missingEvidence.length || 0} items need attention before your next inspection
+                  {stats.missingEvidence.length || 0} items need attention before your next inspection
                 </>
               ) : (
-                <>Load demo data or upload documents to see your readiness score</>
+                <>Upload documents to see your readiness score</>
               )}
             </p>
           </CardContent>
@@ -150,9 +137,7 @@ export default function Dashboard() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">
-                  {demoLoaded ? "All required items are uploaded!" : "Load demo data to see examples"}
-                </p>
+                <p className="text-sm">All required items are uploaded!</p>
               </div>
             )}
           </CardContent>
@@ -205,9 +190,7 @@ export default function Dashboard() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">
-                  {demoLoaded ? "No items due soon" : "Load demo data to see examples"}
-                </p>
+                <p className="text-sm">No items due soon</p>
               </div>
             )}
           </CardContent>
@@ -271,9 +254,7 @@ export default function Dashboard() {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">
-                {demoLoaded ? "No documents awaiting review" : "Load demo data to see examples"}
-              </p>
+              <p className="text-sm">No documents awaiting review</p>
             </div>
           )}
         </CardContent>
