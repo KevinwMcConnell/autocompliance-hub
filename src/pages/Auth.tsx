@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, ArrowRight } from "lucide-react";
-import { toast } from "sonner";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -49,7 +48,6 @@ export default function Auth() {
     if (error) {
       setAuthError(error.message);
     } else {
-      toast.success("Account created! You can now sign in.");
       navigate("/");
     }
   };
