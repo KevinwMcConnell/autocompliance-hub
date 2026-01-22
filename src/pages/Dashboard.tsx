@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { useFacilities } from "@/hooks/useFacilities";
+import { useDemoData } from "@/hooks/useDemoData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ReadinessScore } from "@/components/ReadinessScore";
@@ -18,30 +18,16 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { demoEvidenceItems, demoTasks, demoDocuments, getDemoStats, DemoEvidenceItem, DemoTask, DemoDocument } from "@/lib/demoData";
 
 export default function Dashboard() {
   const { currentFacility } = useFacilities();
-  const [demoLoaded, setDemoLoaded] = useState(false);
-  const [evidenceItems, setEvidenceItems] = useState<DemoEvidenceItem[]>([]);
-  const [tasks, setTasks] = useState<DemoTask[]>([]);
-  const [documents, setDocuments] = useState<DemoDocument[]>([]);
+  const { demoLoaded, evidenceItems, tasks, documents, stats, loadDemoData } = useDemoData();
 
   const handleFilesSelected = (files: File[]) => {
     console.log("Files selected:", files);
     toast.success(`${files.length} file(s) ready for upload`);
   };
 
-  const handleLoadDemoData = () => {
-    setEvidenceItems(demoEvidenceItems);
-    setTasks(demoTasks);
-    setDocuments(demoDocuments);
-    setDemoLoaded(true);
-    toast.success("Demo data loaded! Explore the dashboard to see sample compliance items.");
-  };
-
-  const stats = demoLoaded ? getDemoStats() : null;
-  
   const missingEvidence = demoLoaded 
     ? evidenceItems.filter(e => e.status === "missing" || e.status === "overdue")
     : [];
@@ -70,7 +56,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           {!demoLoaded && (
-            <Button variant="outline" onClick={handleLoadDemoData} className="gap-2">
+            <Button variant="outline" onClick={loadDemoData} className="gap-2">
               <Sparkles className="h-4 w-4" />
               Load Demo Data
             </Button>
