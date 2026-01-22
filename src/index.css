@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ComplianceHub Design System
-   Enterprise-grade compliance management for automotive repair shops
+   Enterprise-grade compliance management
    High-contrast, readable, accessible design
 */
 
@@ -11,28 +11,28 @@
 
 @layer base {
   :root {
-    /* Core backgrounds */
-    --background: 0 0% 99%;
-    --foreground: 220 20% 10%;
+    /* Core backgrounds - Light Mode */
+    --background: 210 40% 98%; /* #F8FAFC */
+    --foreground: 222 47% 11%; /* #0F172A */
 
     /* Cards and surfaces */
-    --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 222 47% 11%; /* #0F172A */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover-foreground: 222 47% 11%;
 
     /* Primary - Accent Blue #2563EB */
     --primary: 217 91% 53%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary - Subtle gray */
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 20% 10%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
 
     /* Muted surfaces */
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 10% 40%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 35%; /* #475569 - Secondary text */
 
     /* Accent - Light blue tint */
     --accent: 217 91% 97%;
@@ -42,38 +42,42 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Status colors */
-    --status-ok: 142 71% 45%;
+    /* Status colors - High contrast with icons */
+    --status-ok: 142 71% 40%;
     --status-ok-foreground: 0 0% 100%;
     --status-ok-muted: 142 76% 94%;
     
-    --status-due-soon: 38 92% 50%;
+    --status-due-soon: 38 92% 45%;
     --status-due-soon-foreground: 0 0% 100%;
     --status-due-soon-muted: 38 92% 94%;
     
-    --status-overdue: 0 72% 51%;
+    --status-overdue: 0 72% 48%;
     --status-overdue-foreground: 0 0% 100%;
     --status-overdue-muted: 0 72% 94%;
     
-    --status-needs-review: 263 70% 58%;
+    --status-needs-review: 263 70% 50%;
     --status-needs-review-foreground: 0 0% 100%;
     --status-needs-review-muted: 263 70% 95%;
 
-    /* Borders and inputs */
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --status-missing: 215 16% 47%;
+    --status-missing-foreground: 0 0% 100%;
+    --status-missing-muted: 215 16% 94%;
+
+    /* Borders and inputs - #E2E8F0 */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
     --ring: 217 91% 53%;
 
     --radius: 0.5rem;
 
     /* Sidebar */
-    --sidebar-background: 220 20% 98%;
-    --sidebar-foreground: 220 15% 25%;
+    --sidebar-background: 210 40% 98%;
+    --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 217 91% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 217 91% 97%;
     --sidebar-accent-foreground: 217 91% 40%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 214 32% 91%;
     --sidebar-ring: 217 91% 53%;
 
     /* Readiness score gradient */
@@ -86,16 +90,16 @@
   }
 
   .dark {
-    /* Core backgrounds - Deep slate */
+    /* Core backgrounds - Dark Mode #0B1220 */
     --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
+    --foreground: 220 14% 91%; /* #E5E7EB */
 
-    /* Cards and surfaces */
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    /* Cards and surfaces - #111827 */
+    --card: 222 47% 9%;
+    --card-foreground: 220 14% 91%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 220 14% 91%;
 
     /* Primary - Accent Blue */
     --primary: 217 91% 60%;
@@ -103,14 +107,14 @@
 
     /* Secondary */
     --secondary: 222 47% 15%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: 220 14% 91%;
 
-    /* Muted */
+    /* Muted - #9CA3AF secondary text */
     --muted: 222 47% 15%;
-    --muted-foreground: 215 20% 65%;
+    --muted-foreground: 218 11% 65%;
 
     /* Accent */
-    --accent: 217 91% 20%;
+    --accent: 217 50% 20%;
     --accent-foreground: 217 91% 85%;
 
     /* Destructive */
@@ -134,19 +138,23 @@
     --status-needs-review-foreground: 0 0% 100%;
     --status-needs-review-muted: 263 50% 15%;
 
-    /* Borders and inputs */
-    --border: 222 47% 20%;
-    --input: 222 47% 20%;
+    --status-missing: 218 11% 50%;
+    --status-missing-foreground: 0 0% 100%;
+    --status-missing-muted: 218 11% 18%;
+
+    /* Borders and inputs - #1F2937 */
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
     --ring: 217 91% 60%;
 
     /* Sidebar */
     --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 210 40% 90%;
+    --sidebar-foreground: 220 14% 91%;
     --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 217 50% 20%;
     --sidebar-accent-foreground: 217 91% 85%;
-    --sidebar-border: 222 47% 18%;
+    --sidebar-border: 217 33% 17%;
     --sidebar-ring: 217 91% 60%;
 
     /* Dropzone */
@@ -162,6 +170,8 @@
 
   html {
     font-family: 'Inter', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
   }
 
   body {
@@ -171,6 +181,33 @@
   /* High contrast text */
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight text-foreground;
+    line-height: 1.3;
+  }
+
+  h1 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h2 {
+    @apply text-xl md:text-2xl;
+  }
+
+  h3 {
+    @apply text-lg md:text-xl;
+  }
+
+  /* Ensure labels and small text are readable */
+  label, .label {
+    @apply text-foreground font-medium;
+  }
+
+  /* Better table readability */
+  th {
+    @apply text-foreground font-semibold;
+  }
+
+  td {
+    @apply text-foreground;
   }
 }
 
@@ -212,5 +249,15 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  /* High contrast focus states */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background;
+  }
+
+  /* Enterprise card styling */
+  .enterprise-card {
+    @apply bg-card border border-border rounded-lg shadow-sm;
   }
 }

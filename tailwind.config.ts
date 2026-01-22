@@ -82,6 +82,11 @@ export default {
             foreground: "hsl(var(--status-needs-review-foreground))",
             muted: "hsl(var(--status-needs-review-muted))",
           },
+          missing: {
+            DEFAULT: "hsl(var(--status-missing))",
+            foreground: "hsl(var(--status-missing-foreground))",
+            muted: "hsl(var(--status-missing-muted))",
+          },
         },
         dropzone: {
           border: "hsl(var(--dropzone-border))",

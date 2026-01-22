@@ -13,6 +13,7 @@ import EvidenceMap from "@/pages/EvidenceMap";
 import UploadInbox from "@/pages/UploadInbox";
 import Tasks from "@/pages/Tasks";
 import Exports from "@/pages/Exports";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
                 <Route path="/uploads" element={<UploadInbox />} />
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/exports" element={<Exports />} />
+                <Route path="/settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
