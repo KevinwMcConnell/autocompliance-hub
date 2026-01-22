@@ -15,14 +15,24 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const blurActiveElement = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    blurActiveElement();
+    setAuthError(null);
     setLoading(true);
     const { error } = await signIn(email, password);
     setLoading(false);
     
     if (error) {
+      setAuthError(error.message);
       toast.error(error.message);
     } else {
       navigate("/");
@@ -31,16 +41,29 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    blurActiveElement();
+    setAuthError(null);
     setLoading(true);
     const { error } = await signUp(email, password);
     setLoading(false);
     
     if (error) {
+      setAuthError(error.message);
       toast.error(error.message);
     } else {
       toast.success("Account created! You can now sign in.");
       navigate("/");
     }
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (authError) setAuthError(null);
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (authError) setAuthError(null);
   };
 
   return (
@@ -107,7 +130,7 @@ export default function Auth() {
                       type="email"
                       placeholder="you@company.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={handleEmailChange}
                       required
                     />
                   </div>
@@ -118,10 +141,15 @@ export default function Auth() {
                       type="password"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={handlePasswordChange}
                       required
                     />
                   </div>
+                  {authError && (
+                    <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive font-medium">
+                      {authError}
+                    </div>
+                  )}
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Signing in..." : "Sign In"}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -138,7 +166,7 @@ export default function Auth() {
                       type="email"
                       placeholder="you@company.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={handleEmailChange}
                       required
                     />
                   </div>
@@ -149,11 +177,16 @@ export default function Auth() {
                       type="password"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={handlePasswordChange}
                       required
                       minLength={6}
                     />
                   </div>
+                  {authError && (
+                    <div className="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive font-medium">
+                      {authError}
+                    </div>
+                  )}
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Creating account..." : "Create Account"}
                     <ArrowRight className="ml-2 h-4 w-4" />
