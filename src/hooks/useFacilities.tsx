@@ -22,16 +22,21 @@ interface FacilitiesContextType {
 const FacilitiesContext = createContext<FacilitiesContextType | undefined>(undefined);
 
 export function FacilitiesProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [currentFacility, setCurrentFacility] = useState<Facility | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasFetched, setHasFetched] = useState(false);
 
   const fetchFacilities = async () => {
     if (!user) {
       setFacilities([]);
       setCurrentFacility(null);
-      setLoading(false);
+      // Only set loading false if auth is also done loading
+      if (!authLoading) {
+        setLoading(false);
+        setHasFetched(true);
+      }
       return;
     }
 
@@ -49,11 +54,17 @@ export function FacilitiesProvider({ children }: { children: ReactNode }) {
       }
     }
     setLoading(false);
+    setHasFetched(true);
   };
 
   useEffect(() => {
+    // Don't fetch until auth is done loading
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
     fetchFacilities();
-  }, [user]);
+  }, [user, authLoading]);
 
   return (
     <FacilitiesContext.Provider

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useFacilities } from "@/hooks/useFacilities";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { Shield, Building2, ArrowRight, ArrowLeft, CheckCircle2, Wrench, FlaskConical, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type FacilityType = "automotive" | "chemical" | "other";
 
@@ -120,10 +121,28 @@ const chemicalQuestions = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { refetch } = useFacilities();
+  const { user, loading: authLoading } = useAuth();
+  const { facilities, loading: facilitiesLoading, refetch } = useFacilities();
   const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+
+  // If user already has facilities, redirect to dashboard
+  if (!authLoading && !facilitiesLoading && facilities.length > 0) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Show loading while auth or facilities are loading
+  if (authLoading || facilitiesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 text-center">
+          <Skeleton className="h-12 w-12 rounded-full mx-auto" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+  
   const [facilityData, setFacilityData] = useState<FacilityData>({
     name: "",
     address: "",
@@ -157,7 +176,7 @@ export default function Onboarding() {
   const handleSubmit = async () => {
     if (!user) return;
 
-    setLoading(true);
+    setFormLoading(true);
 
     // Map facility data to database columns
     const dbData = {
@@ -175,7 +194,7 @@ export default function Onboarding() {
 
     const { error } = await supabase.from("facilities").insert(dbData);
 
-    setLoading(false);
+    setFormLoading(false);
 
     if (error) {
       toast.error("Failed to create facility: " + error.message);
@@ -515,8 +534,8 @@ export default function Onboarding() {
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  <Button onClick={handleSubmit} disabled={loading}>
-                    {loading ? "Creating..." : "Complete Setup"}
+                  <Button onClick={handleSubmit} disabled={formLoading}>
+                    {formLoading ? "Creating..." : "Complete Setup"}
                     <CheckCircle2 className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
