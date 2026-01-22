@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useFacilities } from "@/hooks/useFacilities";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { StatusChip } from "@/components/StatusChip";
@@ -12,49 +12,144 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
-  Calendar,
-  Clock,
-  Plus,
+  Upload,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
-// Mock data
-const mockEvidenceForExport = [
-  { id: "1", name: "Business License", status: "included" as const, lastUpdated: "Jul 1, 2024" },
-  { id: "2", name: "General Liability Insurance", status: "included" as const, lastUpdated: "Oct 1, 2024" },
-  { id: "3", name: "Workers Comp Insurance", status: "included" as const, lastUpdated: "Oct 1, 2024" },
-  { id: "4", name: "Hazardous Waste Manifest", status: "included" as const, lastUpdated: "Dec 15, 2024" },
-  { id: "5", name: "Lift Equipment Certification", status: "included" as const, lastUpdated: "Nov 5, 2024" },
-  { id: "6", name: "Fire Suppression Inspection", status: "needs_review" as const, lastUpdated: "Jan 18, 2025" },
-  { id: "7", name: "Employee Training Records", status: "included" as const, lastUpdated: "Dec 20, 2024" },
-  { id: "8", name: "Air Compressor Inspection", status: "missing" as const, lastUpdated: null },
-  { id: "9", name: "Paint Booth Inspection", status: "due_soon" as const, lastUpdated: "Jan 20, 2024" },
-  { id: "10", name: "SDS Binder", status: "missing" as const, lastUpdated: null },
-];
+interface EvidenceItem {
+  id: string;
+  status: string;
+  last_received_at: string | null;
+  next_due_at: string | null;
+  evidence_type_id: string;
+}
 
-const previousExports = [
-  { id: "1", name: "Inspection Packet - Q4 2024", createdAt: "Dec 31, 2024", itemCount: 12 },
-  { id: "2", name: "Inspection Packet - Q3 2024", createdAt: "Sep 30, 2024", itemCount: 11 },
-  { id: "3", name: "Inspection Packet - EPA Audit", createdAt: "Aug 15, 2024", itemCount: 8 },
-];
+interface ExportPacket {
+  id: string;
+  name: string;
+  created_at: string;
+  status: string;
+  included_evidence_ids: string[] | null;
+}
 
 export default function Exports() {
+  const navigate = useNavigate();
   const { currentFacility } = useFacilities();
-  const [selectedItems, setSelectedItems] = useState<string[]>(
-    mockEvidenceForExport
-      .filter((e) => e.status === "included")
-      .map((e) => e.id)
-  );
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
+  const [exportPackets, setExportPackets] = useState<ExportPacket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
-  const included = mockEvidenceForExport.filter((e) => e.status === "included");
-  const missing = mockEvidenceForExport.filter((e) => e.status === "missing" || e.status === "due_soon");
-  const needsReview = mockEvidenceForExport.filter((e) => e.status === "needs_review");
-  const readinessPercent = Math.round((included.length / mockEvidenceForExport.length) * 100);
+  const fetchData = useCallback(async () => {
+    if (!currentFacility?.id) {
+      setEvidenceItems([]);
+      setExportPackets([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [evidenceRes, packetsRes] = await Promise.all([
+        supabase
+          .from("evidence_items")
+          .select("*")
+          .eq("facility_id", currentFacility.id),
+        supabase
+          .from("export_packets")
+          .select("*")
+          .eq("facility_id", currentFacility.id)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (evidenceRes.error) throw evidenceRes.error;
+      if (packetsRes.error) throw packetsRes.error;
+
+      setEvidenceItems(evidenceRes.data || []);
+      setExportPackets(packetsRes.data || []);
+      
+      // Auto-select "ok" items
+      const okItems = (evidenceRes.data || []).filter(e => e.status === "ok").map(e => e.id);
+      setSelectedItems(okItems);
+    } catch (error) {
+      console.error("Error fetching export data:", error);
+      toast.error("Failed to load export data");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentFacility?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const getStatusFromEvidence = (item: EvidenceItem): "ok" | "needs_review" | "due_soon" | "missing" | "overdue" => {
+    if (item.status === "ok") return "ok";
+    if (item.status === "needs_review") return "needs_review";
+    if (item.status === "due_soon") return "due_soon";
+    if (item.status === "overdue") return "overdue";
+    return "missing";
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const includedItems = evidenceItems.filter((e) => e.status === "ok");
+  const problemItems = evidenceItems.filter((e) => e.status !== "ok");
+  const readinessPercent = evidenceItems.length > 0 
+    ? Math.round((includedItems.length / evidenceItems.length) * 100) 
+    : 0;
 
   const toggleItem = (id: string) => {
     setSelectedItems((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Exports</h1>
+          <p className="text-muted-foreground">Loading export data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state when no evidence items
+  if (evidenceItems.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Exports</h1>
+          <p className="text-muted-foreground">
+            Generate inspection packets for {currentFacility?.name || "your facility"}
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="py-16 text-center">
+            <FileOutput className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">No evidence to export</h3>
+            <p className="text-muted-foreground mb-6">
+              Upload compliance documents first to build your inspection packets.
+            </p>
+            <Button onClick={() => navigate("/uploads")} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Go to Upload Inbox
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -77,7 +172,7 @@ export default function Exports() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">Packet Readiness</CardTitle>
           <CardDescription>
-            {included.length} of {mockEvidenceForExport.length} evidence items ready for export
+            {includedItems.length} of {evidenceItems.length} evidence items ready for export
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -89,15 +184,11 @@ export default function Exports() {
             <div className="flex flex-wrap gap-4">
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-status-ok" />
-                <span className="text-sm">{included.length} Included</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-status-needs-review" />
-                <span className="text-sm">{needsReview.length} Needs Review</span>
+                <span className="text-sm">{includedItems.length} Included</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-status-overdue" />
-                <span className="text-sm">{missing.length} Missing</span>
+                <span className="text-sm">{problemItems.length} Needs Attention</span>
               </div>
             </div>
           </div>
@@ -116,10 +207,9 @@ export default function Exports() {
             <CardDescription>Select items to include in export</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {mockEvidenceForExport
-                .filter((e) => e.status === "included")
-                .map((item) => (
+            {includedItems.length > 0 ? (
+              <div className="space-y-2">
+                {includedItems.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
@@ -130,15 +220,20 @@ export default function Exports() {
                     />
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      <p className="text-sm font-medium truncate">Evidence Item</p>
                       <p className="text-xs text-muted-foreground">
-                        Updated {item.lastUpdated}
+                        {formatDate(item.last_received_at) ? `Updated ${formatDate(item.last_received_at)}` : "Never updated"}
                       </p>
                     </div>
                     <StatusChip status="ok" />
                   </div>
                 ))}
-            </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <p className="text-sm">No evidence items ready for export</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -152,10 +247,9 @@ export default function Exports() {
             <CardDescription>Items that cannot be included yet</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {mockEvidenceForExport
-                .filter((e) => e.status !== "included")
-                .map((item) => (
+            {problemItems.length > 0 ? (
+              <div className="space-y-2">
+                {problemItems.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center gap-3 p-3 rounded-lg bg-muted/30"
@@ -163,62 +257,61 @@ export default function Exports() {
                     <div className="h-4 w-4" /> {/* Spacer for alignment */}
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      <p className="text-sm font-medium truncate">Evidence Item</p>
                       <p className="text-xs text-muted-foreground">
-                        {item.lastUpdated ? `Last updated ${item.lastUpdated}` : "Never uploaded"}
+                        {formatDate(item.last_received_at) ? `Last updated ${formatDate(item.last_received_at)}` : "Never uploaded"}
                       </p>
                     </div>
-                    <StatusChip
-                      status={
-                        item.status === "needs_review"
-                          ? "needs_review"
-                          : item.status === "due_soon"
-                          ? "due_soon"
-                          : "missing"
-                      }
-                    />
+                    <StatusChip status={getStatusFromEvidence(item)} />
                   </div>
                 ))}
-            </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <p className="text-sm">All evidence items are ready!</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Previous Exports */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-medium">Previous Exports</CardTitle>
-              <CardDescription>Download previous inspection packets</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {previousExports.map((exp) => (
-              <div
-                key={exp.id}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <FileOutput className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="font-medium text-sm">{exp.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {exp.createdAt} • {exp.itemCount} items
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-1" />
-                  Download
-                </Button>
+      {exportPackets.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-medium">Previous Exports</CardTitle>
+                <CardDescription>Download previous inspection packets</CardDescription>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {exportPackets.map((exp) => (
+                <div
+                  key={exp.id}
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileOutput className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="font-medium text-sm">{exp.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(exp.created_at)} • {exp.included_evidence_ids?.length || 0} items
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
