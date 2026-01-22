@@ -125,24 +125,6 @@ export default function Onboarding() {
   const { facilities, loading: facilitiesLoading, refetch } = useFacilities();
   const [step, setStep] = useState(0);
   const [formLoading, setFormLoading] = useState(false);
-
-  // If user already has facilities, redirect to dashboard
-  if (!authLoading && !facilitiesLoading && facilities.length > 0) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Show loading while auth or facilities are loading
-  if (authLoading || facilitiesLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="space-y-4 text-center">
-          <Skeleton className="h-12 w-12 rounded-full mx-auto" />
-          <Skeleton className="h-4 w-32 mx-auto" />
-        </div>
-      </div>
-    );
-  }
-  
   const [facilityData, setFacilityData] = useState<FacilityData>({
     name: "",
     address: "",
@@ -168,6 +150,23 @@ export default function Onboarding() {
 
   const totalSteps = 3;
   const progress = ((step + 1) / totalSteps) * 100;
+
+  // If user already has facilities, redirect to dashboard
+  if (!authLoading && !facilitiesLoading && facilities.length > 0) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Show loading while auth or facilities are loading
+  if (authLoading || facilitiesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="space-y-4 text-center">
+          <Skeleton className="h-12 w-12 rounded-full mx-auto" />
+          <Skeleton className="h-4 w-32 mx-auto" />
+        </div>
+      </div>
+    );
+  }
 
   const updateField = (key: keyof FacilityData, value: string | boolean | null) => {
     setFacilityData((prev) => ({ ...prev, [key]: value }));
