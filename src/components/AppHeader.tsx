@@ -12,11 +12,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, LogOut, Settings, User } from "lucide-react";
+import { Bell, LogOut, Settings, User, Building2, ChevronDown, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
-  const { currentFacility } = useFacilities();
+  const { facilities, currentFacility, setCurrentFacility } = useFacilities();
 
   const initials = user?.email
     ? user.email.substring(0, 2).toUpperCase()
@@ -27,12 +29,62 @@ export function AppHeader() {
       <div className="flex h-14 items-center gap-4 px-4">
         <SidebarTrigger />
         
+        {/* Prominent Facility Selector */}
         <div className="flex-1">
-          {currentFacility && (
-            <h1 className="text-sm font-medium text-muted-foreground">
-              {currentFacility.name}
-            </h1>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-auto py-1.5 px-3 gap-2 hover:bg-muted"
+              >
+                <div className="p-1.5 bg-primary/10 rounded-md">
+                  <Building2 className="h-4 w-4 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-foreground">
+                    {currentFacility?.name || "Select Facility"}
+                  </p>
+                  {currentFacility?.city && currentFacility?.state && (
+                    <p className="text-xs text-muted-foreground">
+                      {currentFacility.city}, {currentFacility.state}
+                    </p>
+                  )}
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuLabel>Your Facilities</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {facilities.map((facility) => (
+                <DropdownMenuItem
+                  key={facility.id}
+                  onClick={() => setCurrentFacility(facility)}
+                  className={cn(
+                    "cursor-pointer",
+                    currentFacility?.id === facility.id && "bg-accent"
+                  )}
+                >
+                  <Building2 className="h-4 w-4 mr-2" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-foreground">{facility.name}</p>
+                    {facility.city && facility.state && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {facility.city}, {facility.state}
+                      </p>
+                    )}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/onboarding" className="cursor-pointer">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Facility
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="flex items-center gap-2">
@@ -56,7 +108,7 @@ export function AppHeader() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">Account</p>
+                  <p className="text-sm font-medium text-foreground">Account</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
@@ -65,9 +117,11 @@ export function AppHeader() {
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
+              <DropdownMenuItem asChild>
+                <Link to="/settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => signOut()}>

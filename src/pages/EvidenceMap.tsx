@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFacilities } from "@/hooks/useFacilities";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusChip, StatusType } from "@/components/StatusChip";
@@ -20,23 +20,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UploadDropzone } from "@/components/UploadDropzone";
-import { Search, FileText, Upload, Calendar, Clock } from "lucide-react";
-
-// Mock data
-const mockEvidenceItems = [
-  { id: "1", name: "Hazardous Waste Manifest", category: "Environmental", status: "ok" as StatusType, lastReceived: "Dec 15, 2024", nextDue: "Mar 15, 2025", retention: "3 years", documents: 3 },
-  { id: "2", name: "Paint Booth Inspection", category: "Environmental", status: "due_soon" as StatusType, lastReceived: "Jan 20, 2024", nextDue: "Jan 27, 2025", retention: "1 year", documents: 2 },
-  { id: "3", name: "Air Compressor Inspection", category: "Safety", status: "overdue" as StatusType, lastReceived: "Jan 10, 2024", nextDue: "Jan 10, 2025", retention: "1 year", documents: 1 },
-  { id: "4", name: "Lift Equipment Certification", category: "Safety", status: "ok" as StatusType, lastReceived: "Nov 5, 2024", nextDue: "Nov 5, 2025", retention: "1 year", documents: 2 },
-  { id: "5", name: "Fire Suppression Inspection", category: "Safety", status: "needs_review" as StatusType, lastReceived: "Jan 18, 2025", nextDue: "Jan 18, 2026", retention: "1 year", documents: 1 },
-  { id: "6", name: "Business License", category: "Administrative", status: "ok" as StatusType, lastReceived: "Jul 1, 2024", nextDue: "Jul 1, 2025", retention: "1 year", documents: 1 },
-  { id: "7", name: "Workers Comp Insurance", category: "Administrative", status: "ok" as StatusType, lastReceived: "Oct 1, 2024", nextDue: "Oct 1, 2025", retention: "1 year", documents: 1 },
-  { id: "8", name: "SDS Binder", category: "Safety", status: "missing" as StatusType, lastReceived: null, nextDue: null, retention: "1 year", documents: 0 },
-  { id: "9", name: "Employee Training Records", category: "Safety", status: "ok" as StatusType, lastReceived: "Dec 20, 2024", nextDue: "Dec 20, 2025", retention: "3 years", documents: 5 },
-  { id: "10", name: "First Aid Kit Inspection", category: "Safety", status: "due_soon" as StatusType, lastReceived: "Dec 22, 2024", nextDue: "Jan 22, 2025", retention: "1 year", documents: 12 },
-];
+import { Search, FileText, Calendar, Clock, Info } from "lucide-react";
+import { demoEvidenceItems, DemoEvidenceItem } from "@/lib/demoData";
 
 const mockDocuments = [
   { id: "1", name: "hazwaste_manifest_q4_2024.pdf", uploadedAt: "Dec 15, 2024", size: "245 KB" },
@@ -47,12 +34,12 @@ const mockDocuments = [
 export default function EvidenceMap() {
   const { currentFacility } = useFacilities();
   const [search, setSearch] = useState("");
-  const [selectedItem, setSelectedItem] = useState<typeof mockEvidenceItems[0] | null>(null);
+  const [selectedItem, setSelectedItem] = useState<DemoEvidenceItem | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
 
-  const categories = ["all", ...Array.from(new Set(mockEvidenceItems.map((i) => i.category)))];
+  const categories = ["all", ...Array.from(new Set(demoEvidenceItems.map((i) => i.category)))];
 
-  const filteredItems = mockEvidenceItems.filter((item) => {
+  const filteredItems = demoEvidenceItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = activeCategory === "all" || item.category === activeCategory;
     return matchesSearch && matchesCategory;
@@ -63,7 +50,7 @@ export default function EvidenceMap() {
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(item);
     return acc;
-  }, {} as Record<string, typeof mockEvidenceItems>);
+  }, {} as Record<string, DemoEvidenceItem[]>);
 
   const handleFilesSelected = (files: File[]) => {
     console.log("Files selected:", files);
@@ -73,7 +60,7 @@ export default function EvidenceMap() {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Evidence Map</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Evidence Map</h1>
         <p className="text-muted-foreground">
           Track compliance documents for {currentFacility?.name || "your facility"}
         </p>
@@ -87,7 +74,7 @@ export default function EvidenceMap() {
             placeholder="Search evidence items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 text-foreground"
           />
         </div>
         <Tabs value={activeCategory} onValueChange={setActiveCategory}>
@@ -107,12 +94,12 @@ export default function EvidenceMap() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Evidence Item</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden md:table-cell">Last Received</TableHead>
-                <TableHead className="hidden lg:table-cell">Next Due</TableHead>
-                <TableHead className="hidden lg:table-cell">Retention</TableHead>
-                <TableHead className="text-right">Docs</TableHead>
+                <TableHead className="text-foreground font-semibold">Evidence Item</TableHead>
+                <TableHead className="text-foreground font-semibold">Status</TableHead>
+                <TableHead className="hidden md:table-cell text-foreground font-semibold">Last Received</TableHead>
+                <TableHead className="hidden lg:table-cell text-foreground font-semibold">Next Due</TableHead>
+                <TableHead className="hidden lg:table-cell text-foreground font-semibold">Retention</TableHead>
+                <TableHead className="text-right text-foreground font-semibold">Docs</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -134,7 +121,7 @@ export default function EvidenceMap() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{item.name}</span>
+                          <span className="font-medium text-foreground">{item.name}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -170,13 +157,26 @@ export default function EvidenceMap() {
                 <div className="flex items-center gap-2 mb-2">
                   <StatusChip status={selectedItem.status} />
                 </div>
-                <SheetTitle>{selectedItem.name}</SheetTitle>
+                <SheetTitle className="text-foreground">{selectedItem.name}</SheetTitle>
                 <SheetDescription>
                   {selectedItem.category} • {selectedItem.retention} retention
                 </SheetDescription>
               </SheetHeader>
 
               <div className="mt-6 space-y-6">
+                {/* Plain English Explanation */}
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-primary mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-foreground mb-1">What is this?</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedItem.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Key Dates */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-3 rounded-lg bg-muted/50">
@@ -184,23 +184,23 @@ export default function EvidenceMap() {
                       <Calendar className="h-3.5 w-3.5" />
                       Last Received
                     </div>
-                    <p className="font-medium">{selectedItem.lastReceived || "Never"}</p>
+                    <p className="font-medium text-foreground">{selectedItem.lastReceived || "Never"}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
                     <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                       <Clock className="h-3.5 w-3.5" />
                       Next Due
                     </div>
-                    <p className="font-medium">{selectedItem.nextDue || "Not set"}</p>
+                    <p className="font-medium text-foreground">{selectedItem.nextDue || "Not set"}</p>
                   </div>
                 </div>
 
                 {/* Attached Documents */}
                 <div>
-                  <h4 className="font-medium mb-3">Attached Documents</h4>
-                  {mockDocuments.length > 0 ? (
+                  <h4 className="font-medium mb-3 text-foreground">Attached Documents</h4>
+                  {selectedItem.documents > 0 ? (
                     <div className="space-y-2">
-                      {mockDocuments.map((doc) => (
+                      {mockDocuments.slice(0, selectedItem.documents).map((doc) => (
                         <div
                           key={doc.id}
                           className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
@@ -208,7 +208,7 @@ export default function EvidenceMap() {
                           <div className="flex items-center gap-3">
                             <FileText className="h-4 w-4 text-primary" />
                             <div>
-                              <p className="text-sm font-medium">{doc.name}</p>
+                              <p className="text-sm font-medium text-foreground">{doc.name}</p>
                               <p className="text-xs text-muted-foreground">
                                 {doc.uploadedAt} • {doc.size}
                               </p>
@@ -230,7 +230,7 @@ export default function EvidenceMap() {
 
                 {/* Upload New */}
                 <div>
-                  <h4 className="font-medium mb-3">Upload New Document</h4>
+                  <h4 className="font-medium mb-3 text-foreground">Upload New Document</h4>
                   <UploadDropzone onFilesSelected={handleFilesSelected} />
                 </div>
               </div>

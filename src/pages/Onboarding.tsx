@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
-import { Shield, Building2, ArrowRight, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Shield, Building2, ArrowRight, ArrowLeft, CheckCircle2, Wrench, FlaskConical, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
+
+type FacilityType = "automotive" | "chemical" | "other";
 
 interface FacilityData {
   name: string;
@@ -18,31 +20,102 @@ interface FacilityData {
   city: string;
   state: string;
   zip_code: string;
-  phone: string;
-  email: string;
-  license_number: string;
-  has_hazardous_waste: boolean;
-  has_paint_booth: boolean;
-  has_underground_tanks: boolean;
-  has_air_compressor: boolean;
-  has_lift_equipment: boolean;
-  has_fire_suppression: boolean;
-  has_stormwater_discharge: boolean;
-  has_refrigerant_handling: boolean;
-  has_osha_safety_program: boolean;
-  employee_count: number;
+  facility_type: FacilityType | "";
+  // Automotive questions
+  has_hazardous_waste: boolean | null;
+  waste_shipment_frequency: string;
+  generates_used_oil: boolean | null;
+  used_oil_storage_gallons: string;
+  has_parts_washer: boolean | null;
+  parts_washer_vendor_serviced: boolean | null;
+  has_spray_painting: boolean | null;
+  has_underground_tanks: boolean | null;
+  // Chemical questions
+  stores_regulated_chemicals: boolean | null;
+  sds_count_range: string;
+  has_aboveground_tanks: boolean | null;
+  has_floor_drains: boolean | null;
+  has_air_emissions: boolean | null;
+  generates_hazwaste: boolean | null;
 }
 
-const questions = [
-  { key: "has_hazardous_waste", label: "Do you generate or handle hazardous waste?", description: "Including used oil, solvents, antifreeze, batteries" },
-  { key: "has_paint_booth", label: "Do you have a paint booth or spray area?", description: "For body work, touch-ups, or refinishing" },
-  { key: "has_underground_tanks", label: "Do you have underground storage tanks?", description: "For fuel, oil, or other fluids" },
-  { key: "has_air_compressor", label: "Do you have air compressors?", description: "Pressure vessels over 15 PSI" },
-  { key: "has_lift_equipment", label: "Do you use automotive lifts?", description: "Two-post, four-post, or scissor lifts" },
-  { key: "has_fire_suppression", label: "Do you have fire suppression systems?", description: "Sprinklers, hood systems, or extinguisher stations" },
-  { key: "has_stormwater_discharge", label: "Do you have stormwater discharge?", description: "Floor drains, outdoor wash areas, runoff" },
-  { key: "has_refrigerant_handling", label: "Do you handle refrigerants (A/C service)?", description: "Automotive A/C repair or recharge" },
-  { key: "has_osha_safety_program", label: "Do you have a written safety program?", description: "OSHA-required safety and health program" },
+const automotiveQuestions = [
+  {
+    key: "has_hazardous_waste",
+    question: "Do you generate hazardous waste (solvents, paint waste, parts washer waste, oily absorbents)?",
+    type: "yesNoNotSure",
+  },
+  {
+    key: "waste_shipment_frequency",
+    question: "How often do you ship waste off-site?",
+    type: "select",
+    options: ["Monthly", "Quarterly", "Yearly", "Not sure"],
+  },
+  {
+    key: "generates_used_oil",
+    question: "Do you generate used oil?",
+    type: "yesNo",
+  },
+  {
+    key: "used_oil_storage_gallons",
+    question: "Approx total used-oil storage at any time?",
+    type: "select",
+    options: ["<55 gallons", "55–1,320 gallons", ">1,320 gallons", "Not sure"],
+  },
+  {
+    key: "has_parts_washer",
+    question: "Do you have a parts washer?",
+    type: "yesNo",
+  },
+  {
+    key: "parts_washer_vendor_serviced",
+    question: "If yes, is it serviced by a vendor that removes waste?",
+    type: "yesNoNotSure",
+  },
+  {
+    key: "has_spray_painting",
+    question: "Any spray painting / spray booth?",
+    type: "yesNo",
+  },
+  {
+    key: "has_underground_tanks",
+    question: "Any underground storage tank (UST)?",
+    type: "yesNoNotSure",
+  },
+];
+
+const chemicalQuestions = [
+  {
+    key: "stores_regulated_chemicals",
+    question: "Do you store regulated chemicals on-site?",
+    type: "yesNoNotSure",
+  },
+  {
+    key: "sds_count_range",
+    question: "Approx number of SDS/chemical products?",
+    type: "select",
+    options: ["<25", "25–100", ">100", "Not sure"],
+  },
+  {
+    key: "has_aboveground_tanks",
+    question: "Any aboveground tanks?",
+    type: "yesNoNotSure",
+  },
+  {
+    key: "has_floor_drains",
+    question: "Any discharges / floor drains / wash down?",
+    type: "yesNoNotSure",
+  },
+  {
+    key: "has_air_emissions",
+    question: "Any air-emitting processes?",
+    type: "yesNoNotSure",
+  },
+  {
+    key: "generates_hazwaste",
+    question: "Any hazardous waste generated?",
+    type: "yesNoNotSure",
+  },
 ];
 
 export default function Onboarding() {
@@ -57,25 +130,27 @@ export default function Onboarding() {
     city: "",
     state: "",
     zip_code: "",
-    phone: "",
-    email: "",
-    license_number: "",
-    has_hazardous_waste: false,
-    has_paint_booth: false,
-    has_underground_tanks: false,
-    has_air_compressor: false,
-    has_lift_equipment: false,
-    has_fire_suppression: false,
-    has_stormwater_discharge: false,
-    has_refrigerant_handling: false,
-    has_osha_safety_program: false,
-    employee_count: 1,
+    facility_type: "",
+    has_hazardous_waste: null,
+    waste_shipment_frequency: "",
+    generates_used_oil: null,
+    used_oil_storage_gallons: "",
+    has_parts_washer: null,
+    parts_washer_vendor_serviced: null,
+    has_spray_painting: null,
+    has_underground_tanks: null,
+    stores_regulated_chemicals: null,
+    sds_count_range: "",
+    has_aboveground_tanks: null,
+    has_floor_drains: null,
+    has_air_emissions: null,
+    generates_hazwaste: null,
   });
 
-  const totalSteps = 3; // Basic info, gating questions, employee count
+  const totalSteps = 3;
   const progress = ((step + 1) / totalSteps) * 100;
 
-  const updateField = (key: keyof FacilityData, value: string | boolean | number) => {
+  const updateField = (key: keyof FacilityData, value: string | boolean | null) => {
     setFacilityData((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -83,11 +158,22 @@ export default function Onboarding() {
     if (!user) return;
 
     setLoading(true);
-    const { error } = await supabase.from("facilities").insert({
+
+    // Map facility data to database columns
+    const dbData = {
       user_id: user.id,
-      ...facilityData,
+      name: facilityData.name,
+      address: facilityData.address,
+      city: facilityData.city,
+      state: facilityData.state,
+      zip_code: facilityData.zip_code,
+      has_hazardous_waste: facilityData.has_hazardous_waste ?? false,
+      has_paint_booth: facilityData.has_spray_painting ?? false,
+      has_underground_tanks: facilityData.has_underground_tanks ?? false,
       onboarding_completed: true,
-    });
+    };
+
+    const { error } = await supabase.from("facilities").insert(dbData);
 
     setLoading(false);
 
@@ -100,6 +186,77 @@ export default function Onboarding() {
     }
   };
 
+  const questions = facilityData.facility_type === "automotive" 
+    ? automotiveQuestions 
+    : facilityData.facility_type === "chemical"
+    ? chemicalQuestions
+    : [];
+
+  const renderQuestionInput = (q: typeof automotiveQuestions[0]) => {
+    const value = facilityData[q.key as keyof FacilityData];
+    
+    if (q.type === "yesNo") {
+      return (
+        <RadioGroup
+          value={value === true ? "yes" : value === false ? "no" : ""}
+          onValueChange={(v) => updateField(q.key as keyof FacilityData, v === "yes")}
+          className="flex gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="yes" id={`${q.key}-yes`} />
+            <Label htmlFor={`${q.key}-yes`} className="cursor-pointer">Yes</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="no" id={`${q.key}-no`} />
+            <Label htmlFor={`${q.key}-no`} className="cursor-pointer">No</Label>
+          </div>
+        </RadioGroup>
+      );
+    }
+
+    if (q.type === "yesNoNotSure") {
+      return (
+        <RadioGroup
+          value={value === true ? "yes" : value === false ? "no" : value === null ? "" : "not_sure"}
+          onValueChange={(v) => updateField(q.key as keyof FacilityData, v === "yes" ? true : v === "no" ? false : null)}
+          className="flex gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="yes" id={`${q.key}-yes`} />
+            <Label htmlFor={`${q.key}-yes`} className="cursor-pointer">Yes</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="no" id={`${q.key}-no`} />
+            <Label htmlFor={`${q.key}-no`} className="cursor-pointer">No</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="not_sure" id={`${q.key}-not-sure`} />
+            <Label htmlFor={`${q.key}-not-sure`} className="cursor-pointer">Not sure</Label>
+          </div>
+        </RadioGroup>
+      );
+    }
+
+    if (q.type === "select" && q.options) {
+      return (
+        <RadioGroup
+          value={value as string}
+          onValueChange={(v) => updateField(q.key as keyof FacilityData, v)}
+          className="grid gap-2"
+        >
+          {q.options.map((opt) => (
+            <div key={opt} className="flex items-center space-x-2">
+              <RadioGroupItem value={opt} id={`${q.key}-${opt}`} />
+              <Label htmlFor={`${q.key}-${opt}`} className="cursor-pointer">{opt}</Label>
+            </div>
+          ))}
+        </RadioGroup>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -109,7 +266,7 @@ export default function Onboarding() {
             <div className="p-1.5 bg-primary/10 rounded-lg">
               <Shield className="h-5 w-5 text-primary" />
             </div>
-            <span className="font-semibold">ComplianceHub</span>
+            <span className="font-semibold text-foreground">ComplianceHub</span>
           </div>
         </div>
       </header>
@@ -118,7 +275,7 @@ export default function Onboarding() {
       <div className="border-b bg-card">
         <div className="container py-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Setting up your facility</span>
+            <span className="text-sm font-medium text-foreground">Setting up your facility</span>
             <span className="text-sm text-muted-foreground">Step {step + 1} of {totalSteps}</span>
           </div>
           <Progress value={progress} className="h-2" />
@@ -128,13 +285,14 @@ export default function Onboarding() {
       {/* Content */}
       <div className="flex-1 container py-8">
         <div className="max-w-2xl mx-auto">
+          {/* Step 1: Facility Basics */}
           {step === 0 && (
             <Card className="animate-fade-in">
               <CardHeader>
                 <div className="p-3 bg-primary/10 rounded-xl w-fit mb-4">
                   <Building2 className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle className="text-2xl">Tell us about your facility</CardTitle>
+                <CardTitle className="text-2xl text-foreground">Tell us about your facility</CardTitle>
                 <CardDescription>
                   We'll use this information to set up your compliance profile.
                 </CardDescription>
@@ -142,81 +300,57 @@ export default function Onboarding() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="name">Facility Name *</Label>
+                    <Label htmlFor="name" className="text-foreground">Facility Name *</Label>
                     <Input
                       id="name"
                       placeholder="e.g., Main Street Auto Repair"
                       value={facilityData.name}
                       onChange={(e) => updateField("name", e.target.value)}
                       required
+                      className="text-foreground"
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="address">Street Address</Label>
+                    <Label htmlFor="address" className="text-foreground">Street Address</Label>
                     <Input
                       id="address"
                       placeholder="123 Main Street"
                       value={facilityData.address}
                       onChange={(e) => updateField("address", e.target.value)}
+                      className="text-foreground"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
+                    <Label htmlFor="city" className="text-foreground">City</Label>
                     <Input
                       id="city"
                       placeholder="City"
                       value={facilityData.city}
                       onChange={(e) => updateField("city", e.target.value)}
+                      className="text-foreground"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="state">State</Label>
+                      <Label htmlFor="state" className="text-foreground">State</Label>
                       <Input
                         id="state"
                         placeholder="CA"
                         value={facilityData.state}
                         onChange={(e) => updateField("state", e.target.value)}
+                        className="text-foreground"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="zip">ZIP Code</Label>
+                      <Label htmlFor="zip" className="text-foreground">ZIP Code</Label>
                       <Input
                         id="zip"
                         placeholder="12345"
                         value={facilityData.zip_code}
                         onChange={(e) => updateField("zip_code", e.target.value)}
+                        className="text-foreground"
                       />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="(555) 123-4567"
-                      value={facilityData.phone}
-                      onChange={(e) => updateField("phone", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="facility-email">Email</Label>
-                    <Input
-                      id="facility-email"
-                      type="email"
-                      placeholder="contact@facility.com"
-                      value={facilityData.email}
-                      onChange={(e) => updateField("email", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="license">Business License Number</Label>
-                    <Input
-                      id="license"
-                      placeholder="License number"
-                      value={facilityData.license_number}
-                      onChange={(e) => updateField("license_number", e.target.value)}
-                    />
                   </div>
                 </div>
                 <div className="pt-4 flex justify-end">
@@ -232,36 +366,97 @@ export default function Onboarding() {
             </Card>
           )}
 
+          {/* Step 2: Facility Type */}
           {step === 1 && (
             <Card className="animate-fade-in">
               <CardHeader>
-                <CardTitle className="text-2xl">Compliance Profile Questions</CardTitle>
+                <CardTitle className="text-2xl text-foreground">What type of facility is this?</CardTitle>
                 <CardDescription>
-                  These answers help us determine which compliance requirements apply to your facility.
+                  This helps us show you only the compliance requirements that apply to you.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-1">
-                {questions.map((q) => (
+              <CardContent className="space-y-4">
+                <RadioGroup
+                  value={facilityData.facility_type}
+                  onValueChange={(v) => updateField("facility_type", v as FacilityType)}
+                  className="grid gap-4"
+                >
                   <div
-                    key={q.key}
-                    className="flex items-start justify-between gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors"
+                    className={`flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                      facilityData.facility_type === "automotive"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    onClick={() => updateField("facility_type", "automotive")}
                   >
+                    <RadioGroupItem value="automotive" id="automotive" className="mt-1" />
                     <div className="flex-1">
-                      <p className="font-medium">{q.label}</p>
-                      <p className="text-sm text-muted-foreground">{q.description}</p>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Wrench className="h-5 w-5 text-primary" />
+                        <Label htmlFor="automotive" className="text-base font-semibold cursor-pointer text-foreground">
+                          Automotive Repair Shop
+                        </Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Auto body shops, service centers, dealerships, quick lube, tire shops
+                      </p>
                     </div>
-                    <Switch
-                      checked={facilityData[q.key as keyof FacilityData] as boolean}
-                      onCheckedChange={(checked) => updateField(q.key as keyof FacilityData, checked)}
-                    />
                   </div>
-                ))}
+
+                  <div
+                    className={`flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                      facilityData.facility_type === "chemical"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    onClick={() => updateField("facility_type", "chemical")}
+                  >
+                    <RadioGroupItem value="chemical" id="chemical" className="mt-1" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <FlaskConical className="h-5 w-5 text-primary" />
+                        <Label htmlFor="chemical" className="text-base font-semibold cursor-pointer text-foreground">
+                          Chemical Storage/Handling
+                        </Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Warehouses, distribution, manufacturing with chemical storage
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`flex items-start gap-4 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                      facilityData.facility_type === "other"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    onClick={() => updateField("facility_type", "other")}
+                  >
+                    <RadioGroupItem value="other" id="other" className="mt-1" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <HelpCircle className="h-5 w-5 text-primary" />
+                        <Label htmlFor="other" className="text-base font-semibold cursor-pointer text-foreground">
+                          Other / Not Sure
+                        </Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        We'll help you figure out what applies
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+
                 <div className="pt-4 flex justify-between">
                   <Button variant="outline" onClick={() => setStep(0)}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  <Button onClick={() => setStep(2)}>
+                  <Button
+                    onClick={() => setStep(2)}
+                    disabled={!facilityData.facility_type}
+                  >
                     Continue
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -270,38 +465,51 @@ export default function Onboarding() {
             </Card>
           )}
 
+          {/* Step 3: Type-specific questions */}
           {step === 2 && (
             <Card className="animate-fade-in">
               <CardHeader>
                 <div className="p-3 bg-status-ok/10 rounded-xl w-fit mb-4">
                   <CheckCircle2 className="h-6 w-6 text-status-ok" />
                 </div>
-                <CardTitle className="text-2xl">Almost done!</CardTitle>
+                <CardTitle className="text-2xl text-foreground">
+                  {facilityData.facility_type === "other" 
+                    ? "Almost done!" 
+                    : "A few quick questions"}
+                </CardTitle>
                 <CardDescription>
-                  Just one more question to complete your facility setup.
+                  {facilityData.facility_type === "other"
+                    ? "You can start using ComplianceHub and customize later."
+                    : "These help us identify which compliance requirements apply to you."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="employees">How many employees work at this facility?</Label>
-                  <Input
-                    id="employees"
-                    type="number"
-                    min={1}
-                    value={facilityData.employee_count}
-                    onChange={(e) => updateField("employee_count", parseInt(e.target.value) || 1)}
-                  />
-                </div>
-                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                  <h4 className="font-medium">Summary</h4>
-                  <p className="text-sm text-muted-foreground">
-                    <strong>{facilityData.name}</strong>
-                    {facilityData.city && facilityData.state && ` • ${facilityData.city}, ${facilityData.state}`}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {Object.entries(facilityData).filter(([k, v]) => k.startsWith("has_") && v === true).length} compliance areas identified
-                  </p>
-                </div>
+                {facilityData.facility_type !== "other" && questions.length > 0 && (
+                  <div className="space-y-6">
+                    {questions.map((q, index) => (
+                      <div key={q.key} className="space-y-3">
+                        <p className="font-medium text-foreground">
+                          {index + 1}. {q.question}
+                        </p>
+                        {renderQuestionInput(q)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {facilityData.facility_type === "other" && (
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    <h4 className="font-medium text-foreground">Summary</h4>
+                    <p className="text-sm text-muted-foreground">
+                      <strong className="text-foreground">{facilityData.name}</strong>
+                      {facilityData.city && facilityData.state && ` • ${facilityData.city}, ${facilityData.state}`}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      We'll help you identify applicable requirements as you use the system.
+                    </p>
+                  </div>
+                )}
+
                 <div className="pt-4 flex justify-between">
                   <Button variant="outline" onClick={() => setStep(1)}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
