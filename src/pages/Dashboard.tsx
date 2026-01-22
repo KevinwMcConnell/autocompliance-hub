@@ -1,6 +1,5 @@
 import { useFacilities } from "@/hooks/useFacilities";
 import { useDemoData } from "@/hooks/useDemoData";
-import { useAdmin } from "@/hooks/useAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ReadinessScore } from "@/components/ReadinessScore";
@@ -14,7 +13,6 @@ import {
   Eye,
   ArrowRight,
   Upload,
-  Sparkles,
   Info,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -22,8 +20,7 @@ import { toast } from "sonner";
 
 export default function Dashboard() {
   const { currentFacility } = useFacilities();
-  const { demoLoaded, evidenceItems, tasks, documents, stats, loadDemoData } = useDemoData();
-  const { isAdmin } = useAdmin();
+  const { demoLoaded, evidenceItems, tasks, documents, stats } = useDemoData();
 
   const handleFilesSelected = (files: File[]) => {
     console.log("Files selected:", files);
@@ -57,12 +54,6 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-          {!demoLoaded && isAdmin && (
-            <Button variant="outline" onClick={loadDemoData} className="gap-2 w-full sm:w-auto">
-              <Sparkles className="h-4 w-4" />
-              Load Demo Data
-            </Button>
-          )}
           <Button variant="outline" className="gap-2 w-full sm:w-auto" asChild>
             <Link to="/uploads">
               <Upload className="h-4 w-4" />

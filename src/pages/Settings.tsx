@@ -1,15 +1,18 @@
 import { useFacilities } from "@/hooks/useFacilities";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdmin } from "@/hooks/useAdmin";
+import { useDemoData } from "@/hooks/useDemoData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Building2, User, Bell, Shield } from "lucide-react";
+import { Building2, User, Bell, Shield, Sparkles, Trash2, Wrench } from "lucide-react";
 
 export default function Settings() {
   const { currentFacility } = useFacilities();
   const { user } = useAuth();
+  const { isAdmin, loading: adminLoading } = useAdmin();
+  const { demoLoaded, loadDemoData, clearDemoData } = useDemoData();
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -133,6 +136,44 @@ export default function Settings() {
           <Button variant="outline">Change Password</Button>
         </CardContent>
       </Card>
+
+      {/* Admin Tools - Only visible to admins */}
+      {!adminLoading && isAdmin && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg text-foreground">Admin Tools</CardTitle>
+            </div>
+            <CardDescription>
+              Administrative functions for testing and demo purposes
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-foreground mb-2">Demo Data</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Load sample compliance data to explore app features, or clear it to start fresh.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {!demoLoaded ? (
+                    <Button onClick={loadDemoData} className="gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Load Demo Data
+                    </Button>
+                  ) : (
+                    <Button variant="outline" onClick={clearDemoData} className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Clear Demo Data
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
