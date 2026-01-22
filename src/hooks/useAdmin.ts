@@ -2,11 +2,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
-// Fallback email allowlist (temporary until role data exists)
-const ADMIN_EMAILS: string[] = [
-  "kevinsemail925@gmail.com",
-];
-
 type AppRole = "admin" | "moderator" | "user";
 
 export function useAdmin() {
@@ -23,42 +18,30 @@ export function useAdmin() {
       }
 
       try {
-        // Query user's role from database
+        // Query user's role from database only - no email fallback
         const { data, error } = await supabase.rpc("get_user_role", {
           _user_id: user.id,
         });
 
         if (error) {
           console.error("Error fetching user role:", error);
-          // Fallback to email allowlist
-          const emailIsAdmin = user.email 
-            ? ADMIN_EMAILS.includes(user.email.toLowerCase()) 
-            : false;
-          setRole(emailIsAdmin ? "admin" : "user");
+          setRole("user");
         } else {
-          setRole(data as AppRole || "user");
+          setRole((data as AppRole) || "user");
         }
       } catch (err) {
         console.error("Error in fetchRole:", err);
-        // Fallback to email allowlist
-        const emailIsAdmin = user.email 
-          ? ADMIN_EMAILS.includes(user.email.toLowerCase()) 
-          : false;
-        setRole(emailIsAdmin ? "admin" : "user");
+        setRole("user");
       } finally {
         setLoading(false);
       }
     }
 
     fetchRole();
-  }, [user?.id, user?.email]);
+  }, [user?.id]);
 
-  // Use database role, with email allowlist as fallback
-  const isAdmin = role === "admin" || (
-    role === null && user?.email 
-      ? ADMIN_EMAILS.includes(user.email.toLowerCase()) 
-      : false
-  );
+  // Admin status determined solely by database role
+  const isAdmin = role === "admin";
 
   return { isAdmin, role, loading };
 }

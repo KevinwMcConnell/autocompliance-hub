@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, FileText, Calendar, Clock, Info, Sparkles } from "lucide-react";
+import { Search, FileText, Calendar, Clock, Info } from "lucide-react";
 import { toast } from "sonner";
 import { DemoEvidenceItem } from "@/lib/demoData";
 
@@ -74,23 +74,7 @@ export default function EvidenceMap() {
             Track all compliance documents and their status
           </p>
         </div>
-        {!demoLoaded && (
-          <Button variant="outline" onClick={loadDemoData} className="gap-2">
-            <Sparkles className="h-4 w-4" />
-            Load Demo Data
-          </Button>
-        )}
       </div>
-
-      {/* Demo data notice */}
-      {demoLoaded && (
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
-          <Info className="h-5 w-5 text-primary mt-0.5" />
-          <p className="text-sm text-muted-foreground">
-            Viewing sample compliance data. Click any row to see details and upload documents.
-          </p>
-        </div>
-      )}
 
       {/* Filters */}
       {demoLoaded && (
@@ -181,13 +165,9 @@ export default function EvidenceMap() {
           <CardContent className="py-16 text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No evidence items yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Load demo data to see example compliance requirements
+            <p className="text-muted-foreground">
+              Upload compliance documents to start tracking your requirements.
             </p>
-            <Button onClick={loadDemoData} className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Load Demo Data
-            </Button>
           </CardContent>
         </Card>
       )}

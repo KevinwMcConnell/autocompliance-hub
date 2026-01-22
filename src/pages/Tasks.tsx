@@ -25,8 +25,6 @@ import {
   RotateCcw,
   Calendar,
   AlertTriangle,
-  Sparkles,
-  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DemoTask } from "@/lib/demoData";
@@ -123,29 +121,12 @@ export default function Tasks() {
             Compliance tasks for {currentFacility?.name || "your facility"}
           </p>
         </div>
-        <div className="flex gap-2">
-          {!demoLoaded && (
-            <Button variant="outline" onClick={loadDemoData} className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Load Demo Data
-            </Button>
-          )}
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Task
-          </Button>
-        </div>
+        <Button className="gap-2">
+          <Plus className="h-4 w-4" />
+          Add Task
+        </Button>
       </div>
 
-      {/* Demo data notice */}
-      {demoLoaded && (
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
-          <Info className="h-5 w-5 text-primary mt-0.5" />
-          <p className="text-sm text-muted-foreground">
-            Viewing sample tasks. Complete tasks to see the completion flow in action.
-          </p>
-        </div>
-      )}
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -281,13 +262,9 @@ export default function Tasks() {
           <CardContent className="py-16 text-center">
             <CheckSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No tasks yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Load demo data to see example compliance tasks
+            <p className="text-muted-foreground">
+              Add a task or upload compliance documents to get started.
             </p>
-            <Button onClick={loadDemoData} className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              Load Demo Data
-            </Button>
           </CardContent>
         </Card>
       )}
