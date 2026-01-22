@@ -45,32 +45,32 @@ export default function Dashboard() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-col gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">
             Compliance overview for {currentFacility?.name || "your facility"}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
           {!demoLoaded && (
-            <Button variant="outline" onClick={loadDemoData} className="gap-2">
+            <Button variant="outline" onClick={loadDemoData} className="gap-2 w-full sm:w-auto">
               <Sparkles className="h-4 w-4" />
               Load Demo Data
             </Button>
           )}
-          <Button variant="outline" className="gap-2" asChild>
+          <Button variant="outline" className="gap-2 w-full sm:w-auto" asChild>
             <Link to="/uploads">
               <Upload className="h-4 w-4" />
               Upload Documents
             </Link>
           </Button>
-          <Button size="lg" className="gap-2" asChild>
+          <Button className="gap-2 w-full sm:w-auto" asChild>
             <Link to="/exports">
-              <FileOutput className="h-5 w-5" />
-              Export Inspection Packet
+              <FileOutput className="h-4 w-4" />
+              Export Packet
             </Link>
           </Button>
         </div>
@@ -90,7 +90,7 @@ export default function Dashboard() {
       )}
 
       {/* Top Row - Score + Primary Actions */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 min-w-0">
         {/* Readiness Score Card */}
         <Card className="lg:col-span-1">
           <CardHeader className="pb-2">
@@ -167,7 +167,7 @@ export default function Dashboard() {
       </div>
 
       {/* Middle Row - Due Soon + Upload */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 min-w-0">
         {/* Due Soon */}
         <Card>
           <CardHeader className="pb-2">

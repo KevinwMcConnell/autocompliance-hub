@@ -32,12 +32,12 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full max-w-full overflow-x-hidden">
         <AppSidebar />
-        <SidebarInset className="flex-1">
+        <SidebarInset className="flex-1 min-w-0">
           <AppHeader />
-          <main className="flex-1 p-6">
-            <div className="page-transition">
+          <main className="flex-1 p-4 sm:p-6 max-w-full overflow-x-hidden">
+            <div className="page-transition max-w-full">
               <Outlet />
             </div>
           </main>
