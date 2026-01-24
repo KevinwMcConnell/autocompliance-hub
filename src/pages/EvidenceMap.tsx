@@ -53,6 +53,7 @@ interface Document {
   file_name: string;
   uploaded_at: string;
   file_size: number;
+  storage_path: string;
 }
 
 export default function EvidenceMap() {
@@ -88,7 +89,7 @@ export default function EvidenceMap() {
           .select("*"),
         supabase
           .from("documents")
-          .select("id, file_name, uploaded_at, file_size, evidence_item_id")
+          .select("id, file_name, uploaded_at, file_size, evidence_item_id, storage_path")
           .eq("facility_id", currentFacility.id),
       ]);
 
@@ -158,6 +159,22 @@ export default function EvidenceMap() {
     if (!days) return "—";
     if (days >= 365) return `${Math.round(days / 365)} year${days >= 730 ? "s" : ""}`;
     return `${days} days`;
+  };
+
+  const handleViewDocument = async (storagePath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("compliance-documents")
+        .createSignedUrl(storagePath, 60 * 60); // 1 hour expiry
+
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      }
+    } catch (error) {
+      console.error("Error getting document URL:", error);
+      toast.error("Failed to open document");
+    }
   };
 
 
@@ -399,7 +416,11 @@ export default function EvidenceMap() {
                                 </p>
                               </div>
                             </div>
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleViewDocument(doc.storage_path)}
+                            >
                               View
                             </Button>
                           </div>
