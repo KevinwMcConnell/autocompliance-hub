@@ -1,11 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDemoData } from "@/hooks/useDemoData";
+import { useFacilities } from "@/hooks/useFacilities";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusChip } from "@/components/StatusChip";
 import { UploadDropzone } from "@/components/UploadDropzone";
+import { AddEvidenceDialog } from "@/components/AddEvidenceDialog";
 import {
   Table,
   TableBody,
@@ -23,48 +25,163 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, FileText, Calendar, Clock, Info, Upload } from "lucide-react";
+import { Search, FileText, Calendar, Clock, Info, Upload, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { DemoEvidenceItem } from "@/lib/demoData";
 
-const mockDocuments = [
-  { id: "1", name: "hazwaste_manifest_q4_2024.pdf", uploadedAt: "Dec 15, 2024", size: "245 KB" },
-  { id: "2", name: "hazwaste_manifest_q3_2024.pdf", uploadedAt: "Sep 15, 2024", size: "238 KB" },
-  { id: "3", name: "hazwaste_manifest_q2_2024.pdf", uploadedAt: "Jun 15, 2024", size: "251 KB" },
-];
+interface EvidenceType {
+  id: string;
+  name: string;
+  category: string;
+  description: string | null;
+  retention_days: number | null;
+  recurrence_days: number | null;
+}
+
+interface EvidenceItem {
+  id: string;
+  facility_id: string;
+  evidence_type_id: string;
+  status: string;
+  last_received_at: string | null;
+  next_due_at: string | null;
+  notes: string | null;
+  evidence_type?: EvidenceType;
+}
+
+interface Document {
+  id: string;
+  file_name: string;
+  uploaded_at: string;
+  file_size: number;
+}
 
 export default function EvidenceMap() {
   const navigate = useNavigate();
-  const { demoLoaded, evidenceItems } = useDemoData();
+  const { currentFacility } = useFacilities();
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
+  const [evidenceTypes, setEvidenceTypes] = useState<EvidenceType[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedItem, setSelectedItem] = useState<DemoEvidenceItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<EvidenceItem | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
+  const [addEvidenceOpen, setAddEvidenceOpen] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    if (!currentFacility?.id) {
+      setEvidenceItems([]);
+      setEvidenceTypes([]);
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [itemsRes, typesRes, docsRes] = await Promise.all([
+        supabase
+          .from("evidence_items")
+          .select("*")
+          .eq("facility_id", currentFacility.id),
+        supabase
+          .from("evidence_types")
+          .select("*"),
+        supabase
+          .from("documents")
+          .select("id, file_name, uploaded_at, file_size, evidence_item_id")
+          .eq("facility_id", currentFacility.id),
+      ]);
+
+      if (itemsRes.error) throw itemsRes.error;
+      if (typesRes.error) throw typesRes.error;
+      if (docsRes.error) throw docsRes.error;
+
+      setEvidenceTypes(typesRes.data || []);
+      setDocuments(docsRes.data || []);
+
+      // Enrich evidence items with their type info
+      const enrichedItems = (itemsRes.data || []).map((item) => ({
+        ...item,
+        evidence_type: typesRes.data?.find((t) => t.id === item.evidence_type_id),
+      }));
+      setEvidenceItems(enrichedItems);
+    } catch (error) {
+      console.error("Error fetching evidence data:", error);
+      toast.error("Failed to load evidence data");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentFacility?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const categories = useMemo(() => {
-    return ["all", ...Array.from(new Set(evidenceItems.map((i) => i.category)))];
+    const cats = new Set(evidenceItems.map((i) => i.evidence_type?.category || "Uncategorized"));
+    return ["all", ...Array.from(cats)];
   }, [evidenceItems]);
 
   const filteredItems = useMemo(() => {
     return evidenceItems.filter((item) => {
-      const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = activeCategory === "all" || item.category === activeCategory;
+      const name = item.evidence_type?.name || "";
+      const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
+      const matchesCategory =
+        activeCategory === "all" || item.evidence_type?.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
   }, [evidenceItems, search, activeCategory]);
 
   const groupedItems = useMemo(() => {
     return filteredItems.reduce((acc, item) => {
-      const cat = item.category;
+      const cat = item.evidence_type?.category || "Uncategorized";
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(item);
       return acc;
-    }, {} as Record<string, DemoEvidenceItem[]>);
+    }, {} as Record<string, EvidenceItem[]>);
   }, [filteredItems]);
+
+  const getDocCountForItem = (itemId: string) => {
+    return documents.filter((d: any) => d.evidence_item_id === itemId).length;
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const formatRetention = (days: number | null | undefined) => {
+    if (!days) return "—";
+    if (days >= 365) return `${Math.round(days / 365)} year${days >= 730 ? "s" : ""}`;
+    return `${days} days`;
+  };
 
   const handleFilesSelected = (files: File[]) => {
     console.log("Files selected:", files);
     toast.success(`${files.length} file(s) ready for upload`);
   };
+
+  const getStatusFromItem = (item: EvidenceItem): "ok" | "needs_review" | "due_soon" | "missing" | "overdue" => {
+    if (item.status === "ok") return "ok";
+    if (item.status === "needs_review") return "needs_review";
+    if (item.status === "due_soon") return "due_soon";
+    if (item.status === "overdue") return "overdue";
+    return "missing";
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Evidence Map</h1>
+          <p className="text-muted-foreground">Loading evidence data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -76,10 +193,16 @@ export default function EvidenceMap() {
             Track all compliance documents and their status
           </p>
         </div>
+        {evidenceItems.length > 0 && (
+          <Button onClick={() => setAddEvidenceOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Evidence Item
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
-      {demoLoaded && (
+      {evidenceItems.length > 0 && (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -102,8 +225,8 @@ export default function EvidenceMap() {
         </div>
       )}
 
-      {/* Evidence Table */}
-      {demoLoaded ? (
+      {/* Evidence Table or Empty State */}
+      {evidenceItems.length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -136,23 +259,25 @@ export default function EvidenceMap() {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <FileText className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium text-foreground">{item.name}</span>
+                            <span className="font-medium text-foreground">
+                              {item.evidence_type?.name || "Unknown Type"}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <StatusChip status={item.status} />
+                          <StatusChip status={getStatusFromItem(item)} />
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-muted-foreground">
-                          {item.lastReceived || "—"}
+                          {formatDate(item.last_received_at) || "—"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {item.nextDue || "—"}
+                          {formatDate(item.next_due_at) || "—"}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {item.retention}
+                          {formatRetention(item.evidence_type?.retention_days)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge variant="secondary">{item.documents}</Badge>
+                          <Badge variant="secondary">{getDocCountForItem(item.id)}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -168,15 +293,28 @@ export default function EvidenceMap() {
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No evidence items yet</h3>
             <p className="text-muted-foreground mb-6">
-              Upload compliance documents to start tracking your requirements.
+              Upload compliance documents or create an evidence item to start tracking your requirements.
             </p>
-            <Button onClick={() => navigate("/uploads")} className="gap-2">
-              <Upload className="h-4 w-4" />
-              Go to Upload Inbox
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={() => navigate("/uploads")} className="gap-2">
+                <Upload className="h-4 w-4" />
+                Upload Documents
+              </Button>
+              <Button variant="outline" onClick={() => setAddEvidenceOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Evidence Item
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Add Evidence Dialog */}
+      <AddEvidenceDialog
+        open={addEvidenceOpen}
+        onOpenChange={setAddEvidenceOpen}
+        onEvidenceCreated={fetchData}
+      />
 
       {/* Detail Drawer */}
       <Sheet open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
@@ -185,11 +323,14 @@ export default function EvidenceMap() {
             <>
               <SheetHeader>
                 <div className="flex items-center gap-2 mb-2">
-                  <StatusChip status={selectedItem.status} />
+                  <StatusChip status={getStatusFromItem(selectedItem)} />
                 </div>
-                <SheetTitle className="text-foreground">{selectedItem.name}</SheetTitle>
+                <SheetTitle className="text-foreground">
+                  {selectedItem.evidence_type?.name || "Evidence Item"}
+                </SheetTitle>
                 <SheetDescription>
-                  {selectedItem.category} • {selectedItem.retention} retention
+                  {selectedItem.evidence_type?.category || "Uncategorized"} •{" "}
+                  {formatRetention(selectedItem.evidence_type?.retention_days)} retention
                 </SheetDescription>
               </SheetHeader>
 
@@ -201,7 +342,7 @@ export default function EvidenceMap() {
                     <div>
                       <h4 className="font-medium text-foreground mb-1">What is this?</h4>
                       <p className="text-sm text-muted-foreground">
-                        {selectedItem.description}
+                        {selectedItem.evidence_type?.description || "No description available."}
                       </p>
                     </div>
                   </div>
@@ -214,41 +355,58 @@ export default function EvidenceMap() {
                       <Calendar className="h-3.5 w-3.5" />
                       Last Received
                     </div>
-                    <p className="font-medium text-foreground">{selectedItem.lastReceived || "Never"}</p>
+                    <p className="font-medium text-foreground">
+                      {formatDate(selectedItem.last_received_at) || "Never"}
+                    </p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
                     <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                       <Clock className="h-3.5 w-3.5" />
                       Next Due
                     </div>
-                    <p className="font-medium text-foreground">{selectedItem.nextDue || "Not set"}</p>
+                    <p className="font-medium text-foreground">
+                      {formatDate(selectedItem.next_due_at) || "Not set"}
+                    </p>
                   </div>
                 </div>
+
+                {/* Notes */}
+                {selectedItem.notes && (
+                  <div>
+                    <h4 className="font-medium mb-2 text-foreground">Notes</h4>
+                    <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                      {selectedItem.notes}
+                    </p>
+                  </div>
+                )}
 
                 {/* Attached Documents */}
                 <div>
                   <h4 className="font-medium mb-3 text-foreground">Attached Documents</h4>
-                  {selectedItem.documents > 0 ? (
+                  {getDocCountForItem(selectedItem.id) > 0 ? (
                     <div className="space-y-2">
-                      {mockDocuments.slice(0, selectedItem.documents).map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-4 w-4 text-primary" />
-                            <div>
-                              <p className="text-sm font-medium text-foreground">{doc.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {doc.uploadedAt} • {doc.size}
-                              </p>
+                      {documents
+                        .filter((d: any) => d.evidence_item_id === selectedItem.id)
+                        .map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-4 w-4 text-primary" />
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{doc.file_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(doc.uploaded_at)} •{" "}
+                                  {Math.round(doc.file_size / 1024)} KB
+                                </p>
+                              </div>
                             </div>
+                            <Button variant="ghost" size="sm">
+                              View
+                            </Button>
                           </div>
-                          <Button variant="ghost" size="sm">
-                            View
-                          </Button>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   ) : (
                     <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">

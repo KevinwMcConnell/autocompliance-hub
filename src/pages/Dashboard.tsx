@@ -1,5 +1,6 @@
+import { useState, useEffect, useCallback } from "react";
 import { useFacilities } from "@/hooks/useFacilities";
-import { useDemoData } from "@/hooks/useDemoData";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ReadinessScore } from "@/components/ReadinessScore";
@@ -16,31 +17,149 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { differenceInDays } from "date-fns";
+
+interface EvidenceItem {
+  id: string;
+  status: string;
+  last_received_at: string | null;
+  next_due_at: string | null;
+  evidence_type_id: string;
+}
+
+interface EvidenceType {
+  id: string;
+  name: string;
+  category: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  due_date: string | null;
+}
+
+interface Document {
+  id: string;
+  file_name: string;
+  uploaded_at: string;
+  needs_review: boolean;
+  classification_confidence: number | null;
+}
 
 export default function Dashboard() {
   const { currentFacility } = useFacilities();
-  const { demoLoaded, evidenceItems, tasks, documents, stats } = useDemoData();
+  const [evidenceItems, setEvidenceItems] = useState<(EvidenceItem & { evidence_type?: EvidenceType })[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    if (!currentFacility?.id) {
+      setEvidenceItems([]);
+      setTasks([]);
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [evidenceRes, typesRes, tasksRes, docsRes] = await Promise.all([
+        supabase
+          .from("evidence_items")
+          .select("*")
+          .eq("facility_id", currentFacility.id),
+        supabase
+          .from("evidence_types")
+          .select("id, name, category"),
+        supabase
+          .from("tasks")
+          .select("*")
+          .eq("facility_id", currentFacility.id)
+          .neq("status", "completed")
+          .order("due_date", { ascending: true }),
+        supabase
+          .from("documents")
+          .select("*")
+          .eq("facility_id", currentFacility.id)
+          .order("uploaded_at", { ascending: false }),
+      ]);
+
+      if (evidenceRes.error) throw evidenceRes.error;
+      if (typesRes.error) throw typesRes.error;
+      if (tasksRes.error) throw tasksRes.error;
+      if (docsRes.error) throw docsRes.error;
+
+      // Enrich evidence items with type info
+      const enrichedItems = (evidenceRes.data || []).map((item) => ({
+        ...item,
+        evidence_type: typesRes.data?.find((t) => t.id === item.evidence_type_id),
+      }));
+
+      setEvidenceItems(enrichedItems);
+      setTasks(tasksRes.data || []);
+      setDocuments(docsRes.data || []);
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentFacility?.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleFilesSelected = (files: File[]) => {
     console.log("Files selected:", files);
     toast.success(`${files.length} file(s) ready for upload`);
   };
 
-  const missingEvidence = demoLoaded 
-    ? evidenceItems.filter(e => e.status === "missing" || e.status === "overdue")
-    : [];
-  
-  const dueSoonItems = demoLoaded
-    ? evidenceItems.filter(e => e.status === "due_soon")
-    : [];
+  // Calculate stats
+  const missingEvidence = evidenceItems.filter(
+    (e) => e.status === "missing" || e.status === "overdue"
+  );
 
-  const dueSoonTasks = demoLoaded
-    ? tasks.filter(t => t.status === "pending" && t.daysUntilDue <= 7)
-    : [];
+  const dueSoonItems = evidenceItems.filter((e) => e.status === "due_soon");
 
-  const needsReviewDocs = demoLoaded
-    ? documents.filter(d => d.status === "needs_review")
-    : [];
+  const dueSoonTasks = tasks.filter((t) => {
+    if (!t.due_date) return false;
+    const daysUntil = differenceInDays(new Date(t.due_date), new Date());
+    return daysUntil >= 0 && daysUntil <= 7;
+  });
+
+  const needsReviewDocs = documents.filter((d) => d.needs_review);
+
+  // Calculate readiness score
+  const totalEvidence = evidenceItems.length;
+  const okEvidence = evidenceItems.filter((e) => e.status === "ok").length;
+  const readinessScore = totalEvidence > 0 ? Math.round((okEvidence / totalEvidence) * 100) : 0;
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const getDaysUntilDue = (dueDate: string | null): number => {
+    if (!dueDate) return 999;
+    return differenceInDays(new Date(dueDate), new Date());
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden">
@@ -68,7 +187,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-
       {/* Top Row - Score + Primary Actions */}
       <div className="grid gap-6 lg:grid-cols-3 min-w-0">
         {/* Readiness Score Card */}
@@ -78,11 +196,11 @@ export default function Dashboard() {
             <CardDescription>Your overall compliance status</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center pt-4">
-            <ReadinessScore score={stats?.readinessScore || 0} />
+            <ReadinessScore score={readinessScore} />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              {stats ? (
+              {totalEvidence > 0 ? (
                 <>
-                  {stats.missingEvidence.length || 0} items need attention before your next inspection
+                  {missingEvidence.length} items need attention before your next inspection
                 </>
               ) : (
                 <>Upload documents to see your readiness score</>
@@ -121,11 +239,15 @@ export default function Dashboard() {
                     <div className="flex items-center gap-3">
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium text-sm text-foreground">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">{item.category}</p>
+                        <p className="font-medium text-sm text-foreground">
+                          {item.evidence_type?.name || "Unknown Item"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.evidence_type?.category || "Uncategorized"}
+                        </p>
                       </div>
                     </div>
-                    <StatusChip status={item.status} />
+                    <StatusChip status={item.status as any} />
                   </div>
                 ))}
                 {missingEvidence.length > 4 && (
@@ -137,7 +259,9 @@ export default function Dashboard() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">All required items are uploaded!</p>
+                <p className="text-sm">
+                  {totalEvidence > 0 ? "All required items are uploaded!" : "No evidence items tracked yet"}
+                </p>
               </div>
             )}
           </CardContent>
@@ -168,24 +292,33 @@ export default function Dashboard() {
                     className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                   >
                     <div>
-                      <p className="font-medium text-sm text-foreground">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">Due {item.nextDue}</p>
+                      <p className="font-medium text-sm text-foreground">
+                        {item.evidence_type?.name || "Unknown Item"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Due {formatDate(item.next_due_at)}
+                      </p>
                     </div>
                     <StatusChip status="due_soon" />
                   </div>
                 ))}
-                {dueSoonTasks.slice(0, 3).map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-sm text-foreground">{task.title}</p>
-                      <p className="text-xs text-muted-foreground">Due {task.dueDate} ({task.daysUntilDue} days)</p>
+                {dueSoonTasks.slice(0, 3).map((task) => {
+                  const daysUntil = getDaysUntilDue(task.due_date);
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <div>
+                        <p className="font-medium text-sm text-foreground">{task.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Due {formatDate(task.due_date)} ({daysUntil} days)
+                        </p>
+                      </div>
+                      <StatusChip status={daysUntil <= 3 ? "due_soon" : "ok"} />
                     </div>
-                    <StatusChip status={task.daysUntilDue <= 3 ? "due_soon" : "ok"} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -230,7 +363,7 @@ export default function Dashboard() {
         <CardContent>
           {needsReviewDocs.length > 0 ? (
             <div className="space-y-2">
-              {needsReviewDocs.map((doc) => (
+              {needsReviewDocs.slice(0, 5).map((doc) => (
                 <div
                   key={doc.id}
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
@@ -238,14 +371,18 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3">
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-sm text-foreground">{doc.name}</p>
-                      <p className="text-xs text-muted-foreground">Uploaded {doc.uploadedAt}</p>
+                      <p className="font-medium text-sm text-foreground">{doc.file_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Uploaded {formatDate(doc.uploaded_at)}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">
-                      {doc.confidence}% confidence
-                    </span>
+                    {doc.classification_confidence && (
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(doc.classification_confidence * 100)}% confidence
+                      </span>
+                    )}
                     <StatusChip status="needs_review" />
                   </div>
                 </div>
