@@ -18,6 +18,8 @@ interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   facilityId: string;
+  evidenceItemId?: string; // Optional: link upload to evidence item
+  evidenceTypeRecurrenceDays?: number; // Optional: for calculating next_due_at
   onUploadComplete?: () => void;
 }
 
@@ -26,6 +28,7 @@ interface FileWithStatus {
   status: "pending" | "uploading" | "success" | "error";
   progress: number;
   error?: string;
+  documentId?: string; // Track inserted document ID for approval
 }
 
 const acceptedTypes = [
@@ -42,11 +45,14 @@ export function UploadDialog({
   open,
   onOpenChange,
   facilityId,
+  evidenceItemId,
+  evidenceTypeRecurrenceDays,
   onUploadComplete,
 }: UploadDialogProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Reset all state - called on close/cancel
@@ -59,6 +65,7 @@ export function UploadDialog({
     setFiles([]);
     setIsDragging(false);
     setIsUploading(false);
+    setApprovingIndex(null);
   }, []);
 
   // Handle dialog close (X button or backdrop click)
@@ -145,23 +152,30 @@ export function UploadDialog({
         prev.map((f, i) => (i === index ? { ...f, progress: 60 } : f))
       );
 
-      // Insert document record
-      const { error: insertError } = await supabase.from("documents").insert({
-        facility_id: facilityId,
-        file_name: file.name,
-        file_size: file.size,
-        file_type: file.type || "application/octet-stream",
-        storage_path: storagePath,
-        needs_review: true,
-        uploaded_at: new Date().toISOString(),
-      });
+      // Insert document record - include evidence_item_id if provided
+      const { data: insertedDoc, error: insertError } = await supabase
+        .from("documents")
+        .insert({
+          facility_id: facilityId,
+          evidence_item_id: evidenceItemId || null,
+          file_name: file.name,
+          file_size: file.size,
+          file_type: file.type || "application/octet-stream",
+          storage_path: storagePath,
+          needs_review: true,
+          uploaded_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
 
       if (insertError) throw insertError;
 
-      // Mark success
+      // Mark success and store document ID
       setFiles((prev) =>
         prev.map((f, i) =>
-          i === index ? { ...f, status: "success", progress: 100 } : f
+          i === index
+            ? { ...f, status: "success", progress: 100, documentId: insertedDoc?.id }
+            : f
         )
       );
 
@@ -181,6 +195,60 @@ export function UploadDialog({
         )
       );
       return false;
+    }
+  };
+
+  // Approve a document and update the linked evidence item
+  const handleApprove = async (index: number) => {
+    const fileWithStatus = files[index];
+    if (!fileWithStatus.documentId) return;
+
+    setApprovingIndex(index);
+
+    try {
+      const now = new Date().toISOString();
+
+      // Update document: mark as reviewed
+      const { error: docError } = await supabase
+        .from("documents")
+        .update({
+          needs_review: false,
+          reviewed_at: now,
+        })
+        .eq("id", fileWithStatus.documentId);
+
+      if (docError) throw docError;
+
+      // If linked to an evidence item, update it
+      if (evidenceItemId) {
+        const updateData: Record<string, any> = {
+          last_received_at: now,
+          status: "ok",
+        };
+
+        // Calculate next_due_at if recurrence is set
+        if (evidenceTypeRecurrenceDays && evidenceTypeRecurrenceDays > 0) {
+          const nextDue = new Date();
+          nextDue.setDate(nextDue.getDate() + evidenceTypeRecurrenceDays);
+          updateData.next_due_at = nextDue.toISOString();
+        }
+
+        const { error: evidenceError } = await supabase
+          .from("evidence_items")
+          .update(updateData)
+          .eq("id", evidenceItemId);
+
+        if (evidenceError) throw evidenceError;
+      }
+
+      toast.success("Document approved");
+      onUploadComplete?.();
+      handleOpenChange(false);
+    } catch (error: any) {
+      console.error("Approval error:", error);
+      toast.error("Failed to approve document");
+    } finally {
+      setApprovingIndex(null);
     }
   };
 
@@ -216,78 +284,89 @@ export function UploadDialog({
           failCount > 0 ? `, ${failCount} failed` : ""
         }`
       );
-      onUploadComplete?.();
-
-      // If all succeeded, close dialog after short delay
-      if (failCount === 0) {
-        setTimeout(() => {
-          handleOpenChange(false);
-        }, 500);
+      
+      // If NOT linked to evidence item, close immediately and refresh
+      if (!evidenceItemId) {
+        onUploadComplete?.();
+        if (failCount === 0) {
+          setTimeout(() => {
+            handleOpenChange(false);
+          }, 500);
+        }
       }
+      // If linked to evidence item, keep dialog open for approval
     } else if (failCount > 0) {
       toast.error("All uploads failed. Please try again.");
     }
   };
 
   const pendingFiles = files.filter((f) => f.status === "pending");
+  const successFiles = files.filter((f) => f.status === "success");
   const hasUploading = files.some((f) => f.status === "uploading");
+  const showApprovalFlow = evidenceItemId && successFiles.length > 0 && !isUploading;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Upload Documents</DialogTitle>
+          <DialogTitle className="text-foreground">
+            {evidenceItemId ? "Upload Evidence Document" : "Upload Documents"}
+          </DialogTitle>
           <DialogDescription>
-            Upload compliance documents. They'll be available for review after upload.
+            {evidenceItemId
+              ? "Upload a document for this evidence item. You can approve it to update the status."
+              : "Upload compliance documents. They'll be available for review after upload."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Dropzone */}
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={cn(
-              "relative rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-primary/50 hover:bg-muted/50",
-              isUploading && "pointer-events-none opacity-50"
-            )}
-          >
-            <input
-              type="file"
-              multiple
-              accept={acceptedTypes.join(",")}
-              onChange={handleFileInput}
-              disabled={isUploading}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-            />
-            <div className="flex flex-col items-center gap-2 text-center">
-              <div
-                className={cn(
-                  "p-2.5 rounded-full transition-colors",
-                  isDragging ? "bg-primary/20" : "bg-muted"
-                )}
-              >
-                <Upload
+          {/* Dropzone - hide after successful upload if approval flow */}
+          {(!showApprovalFlow || successFiles.length === 0) && (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={cn(
+                "relative rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
+                isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50 hover:bg-muted/50",
+                isUploading && "pointer-events-none opacity-50"
+              )}
+            >
+              <input
+                type="file"
+                multiple
+                accept={acceptedTypes.join(",")}
+                onChange={handleFileInput}
+                disabled={isUploading}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div
                   className={cn(
-                    "h-5 w-5",
-                    isDragging ? "text-primary" : "text-muted-foreground"
+                    "p-2.5 rounded-full transition-colors",
+                    isDragging ? "bg-primary/20" : "bg-muted"
                   )}
-                />
-              </div>
-              <div>
-                <p className="font-medium text-foreground text-sm">
-                  Drop files here or click to upload
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP
-                </p>
+                >
+                  <Upload
+                    className={cn(
+                      "h-5 w-5",
+                      isDragging ? "text-primary" : "text-muted-foreground"
+                    )}
+                  />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground text-sm">
+                    Drop files here or click to upload
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* File List */}
           {files.length > 0 && (
@@ -338,9 +417,30 @@ export function UploadDialog({
                       <X className="h-4 w-4" />
                     </Button>
                   )}
+                  {/* Approve button for evidence-linked uploads */}
+                  {showApprovalFlow && fileWithStatus.status === "success" && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(index)}
+                      disabled={approvingIndex !== null}
+                    >
+                      {approvingIndex === index ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Approve"
+                      )}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Approval info for evidence-linked uploads */}
+          {showApprovalFlow && (
+            <p className="text-sm text-muted-foreground text-center">
+              Click "Approve" to mark this evidence item as received and update its status.
+            </p>
           )}
         </div>
 
@@ -348,26 +448,28 @@ export function UploadDialog({
           <Button
             variant="outline"
             onClick={() => handleOpenChange(false)}
-            disabled={hasUploading}
+            disabled={hasUploading || approvingIndex !== null}
           >
-            Cancel
+            {showApprovalFlow ? "Close" : "Cancel"}
           </Button>
-          <Button
-            onClick={handleUpload}
-            disabled={pendingFiles.length === 0 || isUploading}
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload {pendingFiles.length > 0 ? `(${pendingFiles.length})` : ""}
-              </>
-            )}
-          </Button>
+          {!showApprovalFlow && (
+            <Button
+              onClick={handleUpload}
+              disabled={pendingFiles.length === 0 || isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload {pendingFiles.length > 0 ? `(${pendingFiles.length})` : ""}
+                </>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
