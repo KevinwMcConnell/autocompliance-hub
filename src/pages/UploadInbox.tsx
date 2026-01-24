@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UploadDropzone } from "@/components/UploadDropzone";
+import { UploadDialog } from "@/components/UploadDialog";
 import { StatusChip } from "@/components/StatusChip";
 import {
   Select,
@@ -21,6 +21,7 @@ import {
   Upload,
   Eye,
   Sparkles,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,6 +50,7 @@ export default function UploadInbox() {
   const [evidenceTypes, setEvidenceTypes] = useState<EvidenceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("needs_review");
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!currentFacility?.id) {
@@ -91,11 +93,6 @@ export default function UploadInbox() {
   const needsReview = documents.filter((d) => d.needs_review);
   const processed = documents.filter((d) => !d.needs_review);
 
-  const handleFilesSelected = (files: File[]) => {
-    console.log("Files selected for upload:", files);
-    toast.success(`${files.length} file(s) ready for upload`);
-  };
-
   const handleApprove = async (docId: string) => {
     try {
       const { error } = await supabase
@@ -122,7 +119,7 @@ export default function UploadInbox() {
         .from("documents")
         .update({
           classification,
-          classification_confidence: 1.0, // 100%
+          classification_confidence: 1.0,
         })
         .eq("id", docId);
 
@@ -184,23 +181,11 @@ export default function UploadInbox() {
             Manage and classify uploaded documents
           </p>
         </div>
+        <Button className="gap-2" onClick={() => setUploadDialogOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Upload Documents
+        </Button>
       </div>
-
-      {/* Upload Zone */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-            <Upload className="h-4 w-4" />
-            Upload Documents
-          </CardTitle>
-          <CardDescription>
-            Drag and drop files here. We'll automatically classify them.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <UploadDropzone onFilesSelected={handleFilesSelected} maxFiles={10} />
-        </CardContent>
-      </Card>
 
       {/* Document List */}
       {documents.length > 0 ? (
@@ -337,11 +322,25 @@ export default function UploadInbox() {
           <CardContent className="py-16 text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No documents yet</h3>
-            <p className="text-muted-foreground">
-              Upload documents above to start processing.
+            <p className="text-muted-foreground mb-6">
+              Upload compliance documents to get started.
             </p>
+            <Button onClick={() => setUploadDialogOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Upload Your First Document
+            </Button>
           </CardContent>
         </Card>
+      )}
+
+      {/* Upload Dialog */}
+      {currentFacility && (
+        <UploadDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          facilityId={currentFacility.id}
+          onUploadComplete={fetchData}
+        />
       )}
     </div>
   );
