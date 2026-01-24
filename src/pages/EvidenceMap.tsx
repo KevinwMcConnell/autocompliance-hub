@@ -431,12 +431,14 @@ export default function EvidenceMap() {
         </SheetContent>
       </Sheet>
 
-      {/* Upload Dialog */}
+      {/* Upload Dialog - linked to selected evidence item when opened from drawer */}
       {currentFacility && (
         <UploadDialog
           open={uploadDialogOpen}
           onOpenChange={setUploadDialogOpen}
           facilityId={currentFacility.id}
+          evidenceItemId={selectedItem?.id}
+          evidenceTypeRecurrenceDays={selectedItem?.evidence_type?.recurrence_days ?? undefined}
           onUploadComplete={fetchData}
         />
       )}
