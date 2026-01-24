@@ -25,7 +25,17 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, FileText, Calendar, Clock, Info, Upload, Plus } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Search, FileText, Calendar, Clock, Info, Upload, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface EvidenceType {
@@ -68,6 +78,8 @@ export default function EvidenceMap() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [addEvidenceOpen, setAddEvidenceOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!currentFacility?.id) {
@@ -177,6 +189,39 @@ export default function EvidenceMap() {
     }
   };
 
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // Delete from storage first
+      const { error: storageError } = await supabase.storage
+        .from("compliance-documents")
+        .remove([documentToDelete.storage_path]);
+
+      if (storageError) {
+        console.error("Storage deletion error:", storageError);
+        // Continue with DB deletion even if storage fails
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentToDelete.id);
+
+      if (dbError) throw dbError;
+
+      toast.success("Document deleted");
+      setDocumentToDelete(null);
+      fetchData(); // Refresh data
+    } catch (error: any) {
+      console.error("Delete error:", error);
+      toast.error("Failed to delete document");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const getStatusFromItem = (item: EvidenceItem): "ok" | "needs_review" | "due_soon" | "missing" | "overdue" => {
     if (item.status === "ok") return "ok";
@@ -416,13 +461,23 @@ export default function EvidenceMap() {
                                 </p>
                               </div>
                             </div>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleViewDocument(doc.storage_path)}
-                            >
-                              View
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleViewDocument(doc.storage_path)}
+                              >
+                                View
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setDocumentToDelete(doc)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         ))}
                     </div>
@@ -463,6 +518,28 @@ export default function EvidenceMap() {
           onUploadComplete={fetchData}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!documentToDelete} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{documentToDelete?.file_name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDocument}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
