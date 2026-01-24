@@ -25,6 +25,8 @@ import {
   RotateCcw,
   Calendar,
   AlertTriangle,
+  FileText,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { differenceInDays } from "date-fns";
@@ -42,9 +44,17 @@ interface Task {
   facility_id: string;
 }
 
+interface RecentDocument {
+  id: string;
+  file_name: string;
+  file_size: number;
+  uploaded_at: string;
+}
+
 export default function Tasks() {
   const { currentFacility } = useFacilities();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [recentDocuments, setRecentDocuments] = useState<RecentDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
@@ -55,19 +65,31 @@ export default function Tasks() {
   const fetchTasks = useCallback(async () => {
     if (!currentFacility?.id) {
       setTasks([]);
+      setRecentDocuments([]);
       setLoading(false);
       return;
     }
 
     try {
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("facility_id", currentFacility.id)
-        .order("due_date", { ascending: true });
+      const [tasksRes, docsRes] = await Promise.all([
+        supabase
+          .from("tasks")
+          .select("*")
+          .eq("facility_id", currentFacility.id)
+          .order("due_date", { ascending: true }),
+        supabase
+          .from("documents")
+          .select("id, file_name, file_size, uploaded_at")
+          .eq("facility_id", currentFacility.id)
+          .order("uploaded_at", { ascending: false })
+          .limit(5),
+      ]);
 
-      if (error) throw error;
-      setTasks(data || []);
+      if (tasksRes.error) throw tasksRes.error;
+      if (docsRes.error) throw docsRes.error;
+
+      setTasks(tasksRes.data || []);
+      setRecentDocuments(docsRes.data || []);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       toast.error("Failed to load tasks");
@@ -98,6 +120,12 @@ export default function Tasks() {
       day: "numeric",
       year: "numeric",
     });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
   const pendingTasks = tasks.filter((t) => {
@@ -385,6 +413,31 @@ export default function Tasks() {
                 onChange={(e) => setCompletionNotes(e.target.value)}
               />
             </div>
+
+            {/* Recent Uploads Section */}
+            {recentDocuments.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Recent Uploads</label>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {recentDocuments.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm"
+                    >
+                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="truncate flex-1 text-foreground">{doc.file_name}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        {formatFileSize(doc.file_size)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Most recent uploads for this facility
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Attach Photos</label>
               <Button variant="outline" className="w-full gap-2">

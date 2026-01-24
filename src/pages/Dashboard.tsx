@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ReadinessScore } from "@/components/ReadinessScore";
 import { StatusChip } from "@/components/StatusChip";
-import { UploadDropzone } from "@/components/UploadDropzone";
+import { UploadDialog } from "@/components/UploadDialog";
 import {
   FileOutput,
   AlertTriangle,
@@ -54,6 +54,7 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!currentFacility?.id) {
@@ -112,10 +113,6 @@ export default function Dashboard() {
     fetchData();
   }, [fetchData]);
 
-  const handleFilesSelected = (files: File[]) => {
-    console.log("Files selected:", files);
-    toast.success(`${files.length} file(s) ready for upload`);
-  };
 
   // Calculate stats
   const missingEvidence = evidenceItems.filter(
@@ -329,17 +326,23 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Upload Dropzone */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold text-foreground">Upload Documents</CardTitle>
-            <CardDescription>Drop compliance documents here to get started</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <UploadDropzone onFilesSelected={handleFilesSelected} />
-          </CardContent>
+        {/* Quick Upload Card */}
+        <Card className="flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setUploadDialogOpen(true)}>
+          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+          <CardTitle className="text-base font-semibold text-foreground mb-1">Upload Documents</CardTitle>
+          <CardDescription className="text-center">Click to upload compliance documents</CardDescription>
         </Card>
       </div>
+
+      {/* Upload Dialog */}
+      {currentFacility && (
+        <UploadDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          facilityId={currentFacility.id}
+          onUploadComplete={fetchData}
+        />
+      )}
 
       {/* Bottom Row - Needs Review */}
       <Card>

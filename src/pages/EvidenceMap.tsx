@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusChip } from "@/components/StatusChip";
-import { UploadDropzone } from "@/components/UploadDropzone";
+import { UploadDialog } from "@/components/UploadDialog";
 import { AddEvidenceDialog } from "@/components/AddEvidenceDialog";
 import {
   Table,
@@ -66,6 +66,7 @@ export default function EvidenceMap() {
   const [selectedItem, setSelectedItem] = useState<EvidenceItem | null>(null);
   const [activeCategory, setActiveCategory] = useState("all");
   const [addEvidenceOpen, setAddEvidenceOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!currentFacility?.id) {
@@ -159,10 +160,6 @@ export default function EvidenceMap() {
     return `${days} days`;
   };
 
-  const handleFilesSelected = (files: File[]) => {
-    console.log("Files selected:", files);
-    toast.success(`${files.length} file(s) ready for upload`);
-  };
 
   const getStatusFromItem = (item: EvidenceItem): "ok" | "needs_review" | "due_soon" | "missing" | "overdue" => {
     if (item.status === "ok") return "ok";
@@ -419,13 +416,30 @@ export default function EvidenceMap() {
                 {/* Upload New */}
                 <div>
                   <h4 className="font-medium mb-3 text-foreground">Upload New Document</h4>
-                  <UploadDropzone onFilesSelected={handleFilesSelected} />
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => setUploadDialogOpen(true)}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Document
+                  </Button>
                 </div>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Upload Dialog */}
+      {currentFacility && (
+        <UploadDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          facilityId={currentFacility.id}
+          onUploadComplete={fetchData}
+        />
+      )}
     </div>
   );
 }
