@@ -31,15 +31,60 @@ interface FileWithStatus {
   documentId?: string; // Track inserted document ID for approval
 }
 
+// NOTE: Mobile/tablet browsers (especially iOS) can be inconsistent about MIME types.
+// We therefore:
+// - Use a permissive `accept` attribute that includes extensions
+// - Validate using BOTH MIME + filename extension
 const acceptedTypes = [
   "application/pdf",
+  "application/x-pdf",
   "image/jpeg",
   "image/png",
   "image/heic",
+  "image/heif",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/zip",
 ];
+
+const ACCEPT_ATTRIBUTE = [
+  ".pdf",
+  "application/pdf",
+  "application/x-pdf",
+  "image/*",
+  ".heic",
+  ".heif",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".docx",
+  ".xlsx",
+  ".zip",
+].join(",");
+
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+
+const isAcceptedFile = (file: File) => {
+  const name = (file.name || "").toLowerCase();
+  const type = (file.type || "").toLowerCase();
+
+  // Prefer MIME when present
+  if (type) {
+    if (acceptedTypes.includes(type)) return true;
+    // Some browsers report images more generally
+    if (type.startsWith("image/")) return true;
+  }
+
+  // Fallback to extension
+  if (name.endsWith(".pdf")) return true;
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")) return true;
+  if (name.endsWith(".heic") || name.endsWith(".heif")) return true;
+  if (name.endsWith(".docx")) return true;
+  if (name.endsWith(".xlsx")) return true;
+  if (name.endsWith(".zip")) return true;
+
+  return false;
+};
 
 export function UploadDialog({
   open,
@@ -107,7 +152,23 @@ export function UploadDialog({
   );
 
   const addFiles = (newFiles: File[]) => {
-    const filesWithStatus: FileWithStatus[] = newFiles.map((file) => ({
+    const valid: File[] = [];
+
+    for (const file of newFiles) {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast.error(`"${file.name}" is too large (max 20MB).`);
+        continue;
+      }
+      if (!isAcceptedFile(file)) {
+        toast.error(`"${file.name}" isn't an accepted file type.`);
+        continue;
+      }
+      valid.push(file);
+    }
+
+    if (valid.length === 0) return;
+
+    const filesWithStatus: FileWithStatus[] = valid.map((file) => ({
       file,
       status: "pending",
       progress: 0,
@@ -337,7 +398,7 @@ export function UploadDialog({
               <input
                 type="file"
                 multiple
-                accept={acceptedTypes.join(",")}
+                 accept={ACCEPT_ATTRIBUTE}
                 onChange={handleFileInput}
                 disabled={isUploading}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
