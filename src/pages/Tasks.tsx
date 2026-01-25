@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusChip } from "@/components/StatusChip";
 import { AddTaskDialog } from "@/components/AddTaskDialog";
+import { UploadDialog } from "@/components/UploadDialog";
 import {
   Dialog,
   DialogContent,
@@ -59,6 +60,7 @@ export default function Tasks() {
   const [activeTab, setActiveTab] = useState("pending");
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
 
@@ -440,7 +442,12 @@ export default function Tasks() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Attach Photos</label>
-              <Button variant="outline" className="w-full gap-2">
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={() => setUploadDialogOpen(true)}
+                disabled={!currentFacility}
+              >
                 <Camera className="h-4 w-4" />
                 Upload Photos
               </Button>
@@ -457,6 +464,16 @@ export default function Tasks() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upload Dialog (used for photo/document uploads from Tasks) */}
+      {currentFacility && (
+        <UploadDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          facilityId={currentFacility.id}
+          onUploadComplete={fetchTasks}
+        />
+      )}
     </div>
   );
 }
