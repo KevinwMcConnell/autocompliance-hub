@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, FileText, X, Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ export function UploadDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastPickRef = useRef<{ sig: string; ts: number }>({ sig: "", ts: 0 });
   
   // Ref to file input for iOS compatibility (reset before each pick)
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,38 +118,13 @@ export function UploadDialog({
     [onOpenChange, resetState]
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFiles = Array.from(e.dataTransfer.files).slice(0, 10);
-    addFiles(droppedFiles);
-  }, []);
-
-  // Handle file input change - reset input value after reading files
-  const handleFileInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selectedFiles = Array.from(e.target.files || []).slice(0, 10);
-      // Debug toast - remove after confirming fix works
-      toast.info(`Picked ${selectedFiles.length} file(s)`);
-      addFiles(selectedFiles);
-      // Reset input immediately so same file can be selected again (iOS fix)
-      e.currentTarget.value = "";
-    },
-    []
-  );
+  // Also reset input whenever the dialog opens (prevents stale picker state on iOS)
+  useEffect(() => {
+    if (open) resetFileInput();
+  }, [open, resetFileInput]);
 
   // Validate and add files with detailed error messages
-  const addFiles = (newFiles: File[]) => {
+  const addFiles = useCallback((newFiles: File[]) => {
     const valid: File[] = [];
 
     for (const file of newFiles) {
@@ -180,7 +156,82 @@ export function UploadDialog({
       progress: 0,
     }));
     setFiles((prev) => [...prev, ...filesWithStatus].slice(0, 10));
-  };
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const droppedFiles = Array.from(e.dataTransfer.files).slice(0, 10);
+      addFiles(droppedFiles);
+    },
+    [addFiles]
+  );
+
+  // Handle file input change - reset input value after reading files
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
+      const input = e.currentTarget;
+      const fileList = (input as HTMLInputElement).files;
+      const selectedFiles = Array.from(fileList || []).slice(0, 10);
+
+      // De-dupe (some browsers can fire both input + change)
+      const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
+      const now = Date.now();
+      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 1000) {
+        (input as HTMLInputElement).value = "";
+        return;
+      }
+      lastPickRef.current = { sig, ts: now };
+
+      // Debug toast - remove after confirming fix works
+      toast.info(`Picked ${selectedFiles.length} file(s)`);
+
+      addFiles(selectedFiles);
+
+      // Reset input immediately so same file can be selected again (iOS fix)
+      (input as HTMLInputElement).value = "";
+    },
+    [addFiles]
+  );
+
+  // Native event listener fallback (iOS Safari can be flaky with React synthetic events)
+  useEffect(() => {
+    const input = fileInputRef.current;
+    if (!input) return;
+
+    const handler = () => {
+      const selectedFiles = Array.from(input.files || []).slice(0, 10);
+      const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
+      const now = Date.now();
+      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 1000) {
+        input.value = "";
+        return;
+      }
+      lastPickRef.current = { sig, ts: now };
+
+      toast.info(`Picked ${selectedFiles.length} file(s)`);
+      addFiles(selectedFiles);
+      input.value = "";
+    };
+
+    input.addEventListener("change", handler);
+    input.addEventListener("input", handler);
+    return () => {
+      input.removeEventListener("change", handler);
+      input.removeEventListener("input", handler);
+    };
+  }, [addFiles]);
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -402,7 +453,9 @@ export function UploadDialog({
                 multiple
                 accept={ACCEPT_ATTRIBUTE}
                 onChange={handleFileInput}
+                onInput={handleFileInput}
                 disabled={isUploading}
+                key={open ? "open" : "closed"}
                 style={{
                   position: "absolute",
                   width: "1px",
@@ -418,6 +471,9 @@ export function UploadDialog({
               />
               <label
                 htmlFor="upload-file-input"
+                onPointerDown={resetFileInput}
+                onMouseDown={resetFileInput}
+                onTouchStart={resetFileInput}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
