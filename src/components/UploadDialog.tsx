@@ -18,8 +18,8 @@ interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   facilityId: string;
-  evidenceItemId?: string; // Optional: link upload to evidence item
-  evidenceTypeRecurrenceDays?: number; // Optional: for calculating next_due_at
+  evidenceItemId?: string;
+  evidenceTypeRecurrenceDays?: number;
   onUploadComplete?: () => void;
 }
 
@@ -28,60 +28,43 @@ interface FileWithStatus {
   status: "pending" | "uploading" | "success" | "error";
   progress: number;
   error?: string;
-  documentId?: string; // Track inserted document ID for approval
+  documentId?: string;
 }
 
-// NOTE: Mobile/tablet browsers (especially iOS) can be inconsistent about MIME types.
-// We therefore:
-// - Use a permissive `accept` attribute that includes extensions
-// - Validate using BOTH MIME + filename extension
-const acceptedTypes = [
-  "application/pdf",
-  "application/x-pdf",
-  "image/jpeg",
-  "image/png",
-  "image/heic",
-  "image/heif",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/zip",
-];
-
-const ACCEPT_ATTRIBUTE = [
-  ".pdf",
-  "application/pdf",
-  "application/x-pdf",
-  "image/*",
-  ".heic",
-  ".heif",
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".docx",
-  ".xlsx",
-  ".zip",
-].join(",");
+// Tablet/iOS-friendly accept attribute - include extensions AND MIME types
+// iOS Safari is inconsistent with MIME types, so extensions are essential
+const ACCEPT_ATTRIBUTE = ".pdf,application/pdf,image/*,.png,.jpg,.jpeg,.heic,.heif,.docx,.xlsx,.zip";
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
-const isAcceptedFile = (file: File) => {
+// Format file size for error messages
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Check if file is accepted - use BOTH MIME and extension for tablet compatibility
+const isAcceptedFile = (file: File): boolean => {
   const name = (file.name || "").toLowerCase();
   const type = (file.type || "").toLowerCase();
 
-  // Prefer MIME when present
-  if (type) {
-    if (acceptedTypes.includes(type)) return true;
-    // Some browsers report images more generally
-    if (type.startsWith("image/")) return true;
-  }
-
-  // Fallback to extension
+  // Check by extension first (more reliable on tablets/iOS)
   if (name.endsWith(".pdf")) return true;
   if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")) return true;
   if (name.endsWith(".heic") || name.endsWith(".heif")) return true;
   if (name.endsWith(".docx")) return true;
   if (name.endsWith(".xlsx")) return true;
   if (name.endsWith(".zip")) return true;
+
+  // Fallback to MIME type if extension check didn't match
+  if (type) {
+    if (type === "application/pdf" || type === "application/x-pdf") return true;
+    if (type.startsWith("image/")) return true;
+    if (type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return true;
+    if (type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") return true;
+    if (type === "application/zip") return true;
+  }
 
   return false;
 };
@@ -99,10 +82,19 @@ export function UploadDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Ref to file input for iOS compatibility (reset before each pick)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset file input value - critical for iOS to allow selecting same file twice
+  const resetFileInput = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
 
   // Reset all state - called on close/cancel
   const resetState = useCallback(() => {
-    // Abort any in-flight uploads
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -111,7 +103,8 @@ export function UploadDialog({
     setIsDragging(false);
     setIsUploading(false);
     setApprovingIndex(null);
-  }, []);
+    resetFileInput();
+  }, [resetFileInput]);
 
   // Handle dialog close (X button or backdrop click)
   const handleOpenChange = useCallback(
@@ -141,28 +134,46 @@ export function UploadDialog({
     addFiles(droppedFiles);
   }, []);
 
+  // Handle file input change - reset input value after reading files
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(e.target.files || []).slice(0, 10);
       addFiles(selectedFiles);
-      // Reset input so same file can be selected again
+      // Reset input immediately so same file can be selected again (iOS fix)
       e.target.value = "";
     },
     []
   );
 
+  // iOS user-gesture compliance: trigger file picker directly from click handler
+  const handleDropzoneClick = useCallback(() => {
+    // Reset input value BEFORE opening picker (iOS fix for selecting same file)
+    resetFileInput();
+    fileInputRef.current?.click();
+  }, [resetFileInput]);
+
+  // Validate and add files with detailed error messages
   const addFiles = (newFiles: File[]) => {
     const valid: File[] = [];
 
     for (const file of newFiles) {
+      // Check file size
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        toast.error(`"${file.name}" is too large (max 20MB).`);
+        toast.error(
+          `"${file.name}" is too large (${formatFileSize(file.size)}). Maximum size is 20MB.`
+        );
         continue;
       }
+
+      // Check file type with detailed error
       if (!isAcceptedFile(file)) {
-        toast.error(`"${file.name}" isn't an accepted file type.`);
+        const typeInfo = file.type ? ` (type: ${file.type})` : " (no type detected)";
+        toast.error(
+          `"${file.name}"${typeInfo} is not an accepted file type. Accepted: PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP.`
+        );
         continue;
       }
+
       valid.push(file);
     }
 
@@ -186,19 +197,16 @@ export function UploadDialog({
   ): Promise<boolean> => {
     const { file } = fileWithStatus;
 
-    // Generate unique path: facilities/{facility_id}/{uuid}-{filename}
     const uuid = crypto.randomUUID();
     const storagePath = `${facilityId}/${uuid}-${file.name}`;
 
     try {
-      // Update status to uploading
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index ? { ...f, status: "uploading", progress: 10 } : f
         )
       );
 
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from("compliance-documents")
         .upload(storagePath, file, {
@@ -208,12 +216,23 @@ export function UploadDialog({
 
       if (uploadError) throw uploadError;
 
-      // Update progress
       setFiles((prev) =>
         prev.map((f, i) => (i === index ? { ...f, progress: 60 } : f))
       );
 
-      // Insert document record - include evidence_item_id if provided
+      // Determine file type - use MIME if available, fallback to extension-based guess
+      let fileType = file.type || "application/octet-stream";
+      if (!file.type || file.type === "") {
+        const name = file.name.toLowerCase();
+        if (name.endsWith(".pdf")) fileType = "application/pdf";
+        else if (name.endsWith(".jpg") || name.endsWith(".jpeg")) fileType = "image/jpeg";
+        else if (name.endsWith(".png")) fileType = "image/png";
+        else if (name.endsWith(".heic") || name.endsWith(".heif")) fileType = "image/heic";
+        else if (name.endsWith(".docx")) fileType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        else if (name.endsWith(".xlsx")) fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        else if (name.endsWith(".zip")) fileType = "application/zip";
+      }
+
       const { data: insertedDoc, error: insertError } = await supabase
         .from("documents")
         .insert({
@@ -221,7 +240,7 @@ export function UploadDialog({
           evidence_item_id: evidenceItemId || null,
           file_name: file.name,
           file_size: file.size,
-          file_type: file.type || "application/octet-stream",
+          file_type: fileType,
           storage_path: storagePath,
           needs_review: true,
           uploaded_at: new Date().toISOString(),
@@ -231,7 +250,6 @@ export function UploadDialog({
 
       if (insertError) throw insertError;
 
-      // Mark success and store document ID
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index
@@ -259,7 +277,6 @@ export function UploadDialog({
     }
   };
 
-  // Approve a document and update the linked evidence item
   const handleApprove = async (index: number) => {
     const fileWithStatus = files[index];
     if (!fileWithStatus.documentId) return;
@@ -269,7 +286,6 @@ export function UploadDialog({
     try {
       const now = new Date().toISOString();
 
-      // Update document: mark as reviewed
       const { error: docError } = await supabase
         .from("documents")
         .update({
@@ -280,14 +296,12 @@ export function UploadDialog({
 
       if (docError) throw docError;
 
-      // If linked to an evidence item, update it
       if (evidenceItemId) {
         const updateData: Record<string, any> = {
           last_received_at: now,
           status: "ok",
         };
 
-        // Calculate next_due_at if recurrence is set
         if (evidenceTypeRecurrenceDays && evidenceTypeRecurrenceDays > 0) {
           const nextDue = new Date();
           nextDue.setDate(nextDue.getDate() + evidenceTypeRecurrenceDays);
@@ -322,7 +336,6 @@ export function UploadDialog({
     let successCount = 0;
     let failCount = 0;
 
-    // Upload files sequentially to avoid overwhelming the server
     for (let i = 0; i < files.length; i++) {
       if (files[i].status === "success") {
         successCount++;
@@ -345,8 +358,7 @@ export function UploadDialog({
           failCount > 0 ? `, ${failCount} failed` : ""
         }`
       );
-      
-      // If NOT linked to evidence item, close immediately and refresh
+
       if (!evidenceItemId) {
         onUploadComplete?.();
         if (failCount === 0) {
@@ -355,7 +367,6 @@ export function UploadDialog({
           }, 500);
         }
       }
-      // If linked to evidence item, keep dialog open for approval
     } else if (failCount > 0) {
       toast.error("All uploads failed. Please try again.");
     }
@@ -387,6 +398,7 @@ export function UploadDialog({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
+              onClick={handleDropzoneClick}
               className={cn(
                 "relative rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
                 isDragging
@@ -395,13 +407,16 @@ export function UploadDialog({
                 isUploading && "pointer-events-none opacity-50"
               )}
             >
+              {/* Hidden file input - controlled via ref for iOS compatibility */}
               <input
+                ref={fileInputRef}
                 type="file"
                 multiple
-                 accept={ACCEPT_ATTRIBUTE}
+                accept={ACCEPT_ATTRIBUTE}
                 onChange={handleFileInput}
                 disabled={isUploading}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                className="hidden"
+                aria-hidden="true"
               />
               <div className="flex flex-col items-center gap-2 text-center">
                 <div
@@ -419,10 +434,10 @@ export function UploadDialog({
                 </div>
                 <div>
                   <p className="font-medium text-foreground text-sm">
-                    Drop files here or click to upload
+                    Tap to select files or drop here
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP
+                    PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                   </p>
                 </div>
               </div>
@@ -464,7 +479,7 @@ export function UploadDialog({
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        {(fileWithStatus.file.size / 1024).toFixed(1)} KB
+                        {formatFileSize(fileWithStatus.file.size)}
                       </p>
                     )}
                   </div>
@@ -472,17 +487,22 @@ export function UploadDialog({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeFile(index)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(index);
+                      }}
                       className="h-8 w-8 p-0"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   )}
-                  {/* Approve button for evidence-linked uploads */}
                   {showApprovalFlow && fileWithStatus.status === "success" && (
                     <Button
                       size="sm"
-                      onClick={() => handleApprove(index)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApprove(index);
+                      }}
                       disabled={approvingIndex !== null}
                     >
                       {approvingIndex === index ? (
@@ -497,7 +517,6 @@ export function UploadDialog({
             </div>
           )}
 
-          {/* Approval info for evidence-linked uploads */}
           {showApprovalFlow && (
             <p className="text-sm text-muted-foreground text-center">
               Click "Approve" to mark this evidence item as received and update its status.
