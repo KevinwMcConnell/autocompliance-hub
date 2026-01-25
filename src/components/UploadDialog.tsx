@@ -138,19 +138,14 @@ export function UploadDialog({
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(e.target.files || []).slice(0, 10);
+      // Debug toast - remove after confirming fix works
+      toast.info(`Picked ${selectedFiles.length} file(s)`);
       addFiles(selectedFiles);
       // Reset input immediately so same file can be selected again (iOS fix)
-      e.target.value = "";
+      e.currentTarget.value = "";
     },
     []
   );
-
-  // iOS user-gesture compliance: trigger file picker directly from click handler
-  const handleDropzoneClick = useCallback(() => {
-    // Reset input value BEFORE opening picker (iOS fix for selecting same file)
-    resetFileInput();
-    fileInputRef.current?.click();
-  }, [resetFileInput]);
 
   // Validate and add files with detailed error messages
   const addFiles = (newFiles: File[]) => {
@@ -394,54 +389,71 @@ export function UploadDialog({
         <div className="space-y-4 py-4">
           {/* Dropzone - hide after successful upload if approval flow */}
           {(!showApprovalFlow || successFiles.length === 0) && (
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={handleDropzoneClick}
-              className={cn(
-                "relative rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
-                isDragging
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/50 hover:bg-muted/50",
-                isUploading && "pointer-events-none opacity-50"
-              )}
-            >
-              {/* Hidden file input - controlled via ref for iOS compatibility */}
+            <>
+              {/* 
+                File input - visually hidden but NOT display:none.
+                iOS Safari ignores programmatic clicks on display:none inputs.
+                Using sr-only-like styles keeps it in DOM and accessible.
+              */}
               <input
+                id="upload-file-input"
                 ref={fileInputRef}
                 type="file"
                 multiple
                 accept={ACCEPT_ATTRIBUTE}
                 onChange={handleFileInput}
                 disabled={isUploading}
-                className="hidden"
-                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  width: "1px",
+                  height: "1px",
+                  padding: 0,
+                  margin: "-1px",
+                  overflow: "hidden",
+                  clip: "rect(0,0,0,0)",
+                  whiteSpace: "nowrap",
+                  border: 0,
+                  opacity: 0,
+                }}
               />
-              <div className="flex flex-col items-center gap-2 text-center">
-                <div
-                  className={cn(
-                    "p-2.5 rounded-full transition-colors",
-                    isDragging ? "bg-primary/20" : "bg-muted"
-                  )}
-                >
-                  <Upload
+              <label
+                htmlFor="upload-file-input"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={cn(
+                  "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
+                  isDragging
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50 hover:bg-muted/50",
+                  isUploading && "pointer-events-none opacity-50"
+                )}
+              >
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <div
                     className={cn(
-                      "h-5 w-5",
-                      isDragging ? "text-primary" : "text-muted-foreground"
+                      "p-2.5 rounded-full transition-colors",
+                      isDragging ? "bg-primary/20" : "bg-muted"
                     )}
-                  />
+                  >
+                    <Upload
+                      className={cn(
+                        "h-5 w-5",
+                        isDragging ? "text-primary" : "text-muted-foreground"
+                      )}
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground text-sm">
+                      Tap to select files or drop here
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-foreground text-sm">
-                    Tap to select files or drop here
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
-                  </p>
-                </div>
-              </div>
-            </div>
+              </label>
+            </>
           )}
 
           {/* File List */}
