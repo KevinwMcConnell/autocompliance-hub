@@ -64,6 +64,8 @@ interface Document {
   uploaded_at: string;
   file_size: number;
   storage_path: string;
+  evidence_item_id: string | null;
+  needs_review: boolean;
 }
 
 export default function EvidenceMap() {
@@ -101,7 +103,7 @@ export default function EvidenceMap() {
           .select("*"),
         supabase
           .from("documents")
-          .select("id, file_name, uploaded_at, file_size, evidence_item_id, storage_path")
+          .select("id, file_name, uploaded_at, file_size, evidence_item_id, storage_path, needs_review")
           .eq("facility_id", currentFacility.id),
       ]);
 
@@ -155,7 +157,15 @@ export default function EvidenceMap() {
   }, [filteredItems]);
 
   const getDocCountForItem = (itemId: string) => {
-    return documents.filter((d: any) => d.evidence_item_id === itemId).length;
+    return documents.filter((d) => d.evidence_item_id === itemId).length;
+  };
+
+  const getApprovedDocCountForItem = (itemId: string) => {
+    return documents.filter((d) => d.evidence_item_id === itemId && !d.needs_review).length;
+  };
+
+  const getPendingDocCountForItem = (itemId: string) => {
+    return documents.filter((d) => d.evidence_item_id === itemId && d.needs_review).length;
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -189,8 +199,77 @@ export default function EvidenceMap() {
     }
   };
 
+  // Recompute evidence item status based on linked documents
+  const recomputeEvidenceItemStatus = async (evidenceItemId: string) => {
+    try {
+      // Fetch all documents linked to this evidence item
+      const { data: linkedDocs, error: docsError } = await supabase
+        .from("documents")
+        .select("id, uploaded_at, needs_review")
+        .eq("evidence_item_id", evidenceItemId);
+
+      if (docsError) throw docsError;
+
+      const approvedDocs = (linkedDocs || []).filter((d) => !d.needs_review);
+      const pendingDocs = (linkedDocs || []).filter((d) => d.needs_review);
+
+      let newStatus: string;
+      let lastReceivedAt: string | null = null;
+      let nextDueAt: string | null = null;
+
+      if (approvedDocs.length > 0) {
+        // Has approved docs -> status OK
+        newStatus = "ok";
+        // Find most recent approved doc upload date
+        const sortedApproved = approvedDocs.sort(
+          (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+        );
+        lastReceivedAt = sortedApproved[0].uploaded_at;
+
+        // Get the evidence item to find recurrence_days from evidence type
+        const item = evidenceItems.find((i) => i.id === evidenceItemId);
+        const recurrenceDays = item?.evidence_type?.recurrence_days;
+        
+        if (recurrenceDays && recurrenceDays > 0) {
+          const nextDue = new Date(lastReceivedAt);
+          nextDue.setDate(nextDue.getDate() + recurrenceDays);
+          nextDueAt = nextDue.toISOString();
+        }
+      } else if (pendingDocs.length > 0) {
+        // Has docs but all need review
+        newStatus = "needs_review";
+      } else {
+        // No docs at all
+        newStatus = "missing";
+      }
+
+      // Update evidence item
+      const updateData: Record<string, any> = {
+        status: newStatus,
+        last_received_at: lastReceivedAt,
+      };
+      if (nextDueAt) {
+        updateData.next_due_at = nextDueAt;
+      }
+
+      const { error: updateError } = await supabase
+        .from("evidence_items")
+        .update(updateData)
+        .eq("id", evidenceItemId);
+
+      if (updateError) throw updateError;
+    } catch (error) {
+      console.error("Error recomputing evidence item status:", error);
+      // Don't throw - we still want to continue with refresh
+    }
+  };
+
   const handleDeleteDocument = async () => {
     if (!documentToDelete) return;
+
+    // Get the evidence_item_id before deleting
+    const docToDelete = documents.find((d) => d.id === documentToDelete.id);
+    const linkedEvidenceItemId = docToDelete?.evidence_item_id;
 
     setIsDeleting(true);
     try {
@@ -211,6 +290,11 @@ export default function EvidenceMap() {
         .eq("id", documentToDelete.id);
 
       if (dbError) throw dbError;
+
+      // Recompute evidence item status if doc was linked
+      if (linkedEvidenceItemId) {
+        await recomputeEvidenceItemStatus(linkedEvidenceItemId);
+      }
 
       toast.success("Document deleted");
       setDocumentToDelete(null);
@@ -336,7 +420,14 @@ export default function EvidenceMap() {
                           {formatRetention(item.evidence_type?.retention_days)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge variant="secondary">{getDocCountForItem(item.id)}</Badge>
+                          <div className="flex items-center justify-end gap-1">
+                            <Badge variant="secondary">{getApprovedDocCountForItem(item.id)}</Badge>
+                            {getPendingDocCountForItem(item.id) > 0 && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-600/50">
+                                +{getPendingDocCountForItem(item.id)} pending
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -445,16 +536,25 @@ export default function EvidenceMap() {
                   {getDocCountForItem(selectedItem.id) > 0 ? (
                     <div className="space-y-2">
                       {documents
-                        .filter((d: any) => d.evidence_item_id === selectedItem.id)
+                        .filter((d) => d.evidence_item_id === selectedItem.id)
                         .map((doc) => (
                           <div
                             key={doc.id}
-                            className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                            className={`flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors ${
+                              doc.needs_review ? "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20" : ""
+                            }`}
                           >
                             <div className="flex items-center gap-3">
                               <FileText className="h-4 w-4 text-primary" />
                               <div>
-                                <p className="text-sm font-medium text-foreground">{doc.file_name}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium text-foreground">{doc.file_name}</p>
+                                  {doc.needs_review && (
+                                    <Badge variant="outline" className="text-amber-600 border-amber-500 text-xs">
+                                      Pending Review
+                                    </Badge>
+                                  )}
+                                </div>
                                 <p className="text-xs text-muted-foreground">
                                   {formatDate(doc.uploaded_at)} •{" "}
                                   {Math.round(doc.file_size / 1024)} KB
