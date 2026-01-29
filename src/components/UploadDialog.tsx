@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useId } from "react";
 import { Upload, FileText, X, Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,9 @@ interface FileWithStatus {
 const ACCEPT_ATTRIBUTE = ".pdf,application/pdf,image/*,.png,.jpg,.jpeg,.heic,.heif,.docx,.xlsx,.zip";
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+
+// Max number of files kept in the dialog queue (can still upload repeatedly)
+const MAX_FILES_PER_QUEUE = 50;
 
 // Format file size for error messages
 const formatFileSize = (bytes: number): string => {
@@ -77,12 +80,19 @@ export function UploadDialog({
   evidenceTypeRecurrenceDays,
   onUploadComplete,
 }: UploadDialogProps) {
+  const inputId = useId();
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastPickRef = useRef<{ sig: string; ts: number }>({ sig: "", ts: 0 });
+
+  // Avoid side-effects inside setState updaters; keep a lightweight ref of current queue length.
+  const filesCountRef = useRef(0);
+  useEffect(() => {
+    filesCountRef.current = files.length;
+  }, [files.length]);
   
   // Ref to file input for iOS compatibility (reset before each pick)
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,12 +160,26 @@ export function UploadDialog({
 
     if (valid.length === 0) return;
 
+    const remaining = Math.max(0, MAX_FILES_PER_QUEUE - filesCountRef.current);
+    if (remaining === 0) {
+      toast.error(`You can queue up to ${MAX_FILES_PER_QUEUE} files at a time.`);
+      return;
+    }
+
     const filesWithStatus: FileWithStatus[] = valid.map((file) => ({
       file,
       status: "pending",
       progress: 0,
     }));
-    setFiles((prev) => [...prev, ...filesWithStatus].slice(0, 10));
+
+    if (filesWithStatus.length > remaining) {
+      toast.error(
+        `Only the first ${remaining} file(s) were added (queue limit: ${MAX_FILES_PER_QUEUE}).`
+      );
+    }
+
+    const toAdd = filesWithStatus.slice(0, remaining);
+    setFiles((prev) => [...prev, ...toAdd]);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -172,7 +196,7 @@ export function UploadDialog({
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      const droppedFiles = Array.from(e.dataTransfer.files).slice(0, 10);
+      const droppedFiles = Array.from(e.dataTransfer.files).slice(0, MAX_FILES_PER_QUEUE);
       addFiles(droppedFiles);
     },
     [addFiles]
@@ -183,12 +207,14 @@ export function UploadDialog({
     (e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
       const input = e.currentTarget;
       const fileList = (input as HTMLInputElement).files;
-      const selectedFiles = Array.from(fileList || []).slice(0, 10);
+      const selectedFiles = Array.from(fileList || []).slice(0, MAX_FILES_PER_QUEUE);
 
       // De-dupe (some browsers can fire both input + change)
       const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
       const now = Date.now();
-      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 1000) {
+      // Some browsers fire both input + change; keep a VERY short dedupe window
+      // so we don't block users from intentionally selecting the same file again.
+      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 250) {
         (input as HTMLInputElement).value = "";
         return;
       }
@@ -211,10 +237,10 @@ export function UploadDialog({
     if (!input) return;
 
     const handler = () => {
-      const selectedFiles = Array.from(input.files || []).slice(0, 10);
+       const selectedFiles = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
       const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
       const now = Date.now();
-      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 1000) {
+       if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 250) {
         input.value = "";
         return;
       }
@@ -433,80 +459,77 @@ export function UploadDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Dropzone - hide after successful upload if approval flow */}
-          {/* Always show dropzone - users can upload as many files as they want */}
-          {(
-            <>
-              {/* 
-                File input - visually hidden but NOT display:none.
-                iOS Safari ignores programmatic clicks on display:none inputs.
-                Using sr-only-like styles keeps it in DOM and accessible.
-              */}
-              <input
-                id="upload-file-input"
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept={ACCEPT_ATTRIBUTE}
-                onChange={handleFileInput}
-                onInput={handleFileInput}
-                disabled={isUploading}
-                key={open ? "open" : "closed"}
-                style={{
-                  position: "absolute",
-                  width: "1px",
-                  height: "1px",
-                  padding: 0,
-                  margin: "-1px",
-                  overflow: "hidden",
-                  clip: "rect(0,0,0,0)",
-                  whiteSpace: "nowrap",
-                  border: 0,
-                  opacity: 0,
-                }}
-              />
-              <label
-                htmlFor="upload-file-input"
-                onPointerDown={resetFileInput}
-                onMouseDown={resetFileInput}
-                onTouchStart={resetFileInput}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={cn(
-                  "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
-                  isDragging
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50 hover:bg-muted/50",
-                  isUploading && "pointer-events-none opacity-50"
-                )}
-              >
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <div
+          {/* Dropzone (always visible so users can keep adding files) */}
+          <>
+            {/* 
+              File input - visually hidden but NOT display:none.
+              iOS Safari ignores programmatic clicks on display:none inputs.
+              Using sr-only-like styles keeps it in DOM and accessible.
+            */}
+            <input
+              id={inputId}
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={ACCEPT_ATTRIBUTE}
+              onChange={handleFileInput}
+              onInput={handleFileInput}
+              disabled={isUploading}
+              key={open ? "open" : "closed"}
+              style={{
+                position: "absolute",
+                width: "1px",
+                height: "1px",
+                padding: 0,
+                margin: "-1px",
+                overflow: "hidden",
+                clip: "rect(0,0,0,0)",
+                whiteSpace: "nowrap",
+                border: 0,
+                opacity: 0,
+              }}
+            />
+            <label
+              htmlFor={inputId}
+              onPointerDown={resetFileInput}
+              onMouseDown={resetFileInput}
+              onTouchStart={resetFileInput}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={cn(
+                "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
+                isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50 hover:bg-muted/50",
+                isUploading && "pointer-events-none opacity-50"
+              )}
+            >
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div
+                  className={cn(
+                    "p-2.5 rounded-full transition-colors",
+                    isDragging ? "bg-primary/20" : "bg-muted"
+                  )}
+                >
+                  <Upload
                     className={cn(
-                      "p-2.5 rounded-full transition-colors",
-                      isDragging ? "bg-primary/20" : "bg-muted"
+                      "h-5 w-5",
+                      isDragging ? "text-primary" : "text-muted-foreground"
                     )}
-                  >
-                    <Upload
-                      className={cn(
-                        "h-5 w-5",
-                        isDragging ? "text-primary" : "text-muted-foreground"
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground text-sm">
-                      Tap to select files or drop here
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
-                    </p>
-                  </div>
+                  />
                 </div>
-              </label>
-            </>
-          )}
+                <div>
+                  <p className="font-medium text-foreground text-sm">
+                    Tap to select files or drop here
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
+                  </p>
+                </div>
+              </div>
+            </label>
+          </>
 
           {/* File List */}
           {files.length > 0 && (
