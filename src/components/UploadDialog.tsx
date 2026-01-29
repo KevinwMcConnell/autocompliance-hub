@@ -405,14 +405,9 @@ export function UploadDialog({
         }`
       );
 
-      if (!evidenceItemId) {
-        onUploadComplete?.();
-        if (failCount === 0) {
-          setTimeout(() => {
-            handleOpenChange(false);
-          }, 500);
-        }
-      }
+      // Always notify parent of completion, but do NOT auto-close
+      // User should be able to upload more files if they want
+      onUploadComplete?.();
     } else if (failCount > 0) {
       toast.error("All uploads failed. Please try again.");
     }
@@ -439,7 +434,8 @@ export function UploadDialog({
 
         <div className="space-y-4 py-4">
           {/* Dropzone - hide after successful upload if approval flow */}
-          {(!showApprovalFlow || successFiles.length === 0) && (
+          {/* Always show dropzone - users can upload as many files as they want */}
+          {(
             <>
               {/* 
                 File input - visually hidden but NOT display:none.
