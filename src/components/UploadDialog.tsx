@@ -209,6 +209,13 @@ export function UploadDialog({
       const fileList = (input as HTMLInputElement).files;
       const selectedFiles = Array.from(fileList || []).slice(0, MAX_FILES_PER_QUEUE);
 
+      // iOS Safari can occasionally fire an event with an empty FileList right after
+      // the picker closes. If we clear the input in that case, we can accidentally
+      // wipe out the real selection before the next event arrives.
+      if (selectedFiles.length === 0) {
+        return;
+      }
+
       // De-dupe (some browsers can fire both input + change)
       const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
       const now = Date.now();
@@ -219,9 +226,6 @@ export function UploadDialog({
         return;
       }
       lastPickRef.current = { sig, ts: now };
-
-      // Debug toast - remove after confirming fix works
-      toast.info(`Picked ${selectedFiles.length} file(s)`);
 
       addFiles(selectedFiles);
 
@@ -237,7 +241,13 @@ export function UploadDialog({
     if (!input) return;
 
     const handler = () => {
-       const selectedFiles = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
+      const selectedFiles = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
+
+      // Same guard as the React handler: ignore empty events so we don't clear the
+      // user's real selection on iOS.
+      if (selectedFiles.length === 0) {
+        return;
+      }
       const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
       const now = Date.now();
        if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 250) {
@@ -245,8 +255,6 @@ export function UploadDialog({
         return;
       }
       lastPickRef.current = { sig, ts: now };
-
-      toast.info(`Picked ${selectedFiles.length} file(s)`);
       addFiles(selectedFiles);
       input.value = "";
     };
