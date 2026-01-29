@@ -270,7 +270,17 @@ export default function UploadInbox() {
                   <CardContent className="py-12 text-center">
                     <CheckCircle2 className="h-12 w-12 mx-auto mb-4 text-status-ok opacity-50" />
                     <h3 className="font-medium text-lg mb-1 text-foreground">All caught up!</h3>
-                    <p className="text-muted-foreground">No documents need review right now.</p>
+                     <p className="text-muted-foreground">
+                       No documents need review right now — you can still upload more anytime.
+                     </p>
+                     <Button
+                       variant="outline"
+                       className="mt-4 gap-2"
+                       onClick={() => setUploadDialogOpen(true)}
+                     >
+                       <Upload className="h-4 w-4" />
+                       Upload more documents
+                     </Button>
                   </CardContent>
                 </Card>
               )}
