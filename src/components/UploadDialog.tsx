@@ -235,22 +235,24 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Native event listener fallback (iOS Safari can be flaky with React synthetic events)
+  // Native event listener fallback (iOS Safari AND Android Chrome can both miss React synthetic events)
   useEffect(() => {
     const input = fileInputRef.current;
     if (!input) return;
 
-    const handler = () => {
-      const selectedFiles = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
+    const handler = (e: Event) => {
+      // Immediately capture before any browser quirks clear it
+      const files = (e.target as HTMLInputElement).files;
+      const selectedFiles = Array.from(files || []).slice(0, MAX_FILES_PER_QUEUE);
 
-      // Same guard as the React handler: ignore empty events so we don't clear the
-      // user's real selection on iOS.
+      // Ignore empty events (some browsers fire spurious ones)
       if (selectedFiles.length === 0) {
         return;
       }
+
       const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
       const now = Date.now();
-       if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 250) {
+      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 250) {
         input.value = "";
         return;
       }
@@ -259,13 +261,19 @@ export function UploadDialog({
       input.value = "";
     };
 
-    input.addEventListener("change", handler);
-    input.addEventListener("input", handler);
+    input.addEventListener("change", handler, { capture: true });
+    input.addEventListener("input", handler, { capture: true });
     return () => {
-      input.removeEventListener("change", handler);
-      input.removeEventListener("input", handler);
+      input.removeEventListener("change", handler, { capture: true });
+      input.removeEventListener("input", handler, { capture: true });
     };
   }, [addFiles]);
+
+  // On Android, htmlFor→click can fail. Trigger the picker programmatically.
+  const openFilePicker = useCallback(() => {
+    resetFileInput();
+    fileInputRef.current?.click();
+  }, [resetFileInput]);
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -474,39 +482,43 @@ export function UploadDialog({
               iOS Safari ignores programmatic clicks on display:none inputs.
               Using sr-only-like styles keeps it in DOM and accessible.
             */}
+            {/* 
+              Android Chrome: We attach a native click handler that immediately reads
+              the FileList before Android can clear it. Also avoid opacity: 0 by using
+              a transparent background and offscreen positioning. 
+            */}
             <input
               id={inputId}
               ref={fileInputRef}
               type="file"
               multiple
               accept={ACCEPT_ATTRIBUTE}
-              onChange={handleFileInput}
-              onInput={handleFileInput}
               disabled={isUploading}
               key={open ? "open" : "closed"}
               style={{
-                position: "absolute",
+                position: "fixed",
+                top: "-9999px",
+                left: "-9999px",
                 width: "1px",
                 height: "1px",
-                padding: 0,
-                margin: "-1px",
-                overflow: "hidden",
-                clip: "rect(0,0,0,0)",
-                whiteSpace: "nowrap",
-                border: 0,
-                opacity: 0,
               }}
             />
-            <label
-              htmlFor={inputId}
-              onPointerDown={resetFileInput}
-              onMouseDown={resetFileInput}
-              onTouchStart={resetFileInput}
+            {/* 
+              Use onClick to trigger picker programmatically (Android Chrome often ignores htmlFor). 
+              Also listen for drag-and-drop.
+            */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={openFilePicker}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") openFilePicker();
+              }}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               className={cn(
-                "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer",
+                "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer select-none",
                 isDragging
                   ? "border-primary bg-primary/5"
                   : "border-border hover:border-primary/50 hover:bg-muted/50",
@@ -536,7 +548,7 @@ export function UploadDialog({
                   </p>
                 </div>
               </div>
-            </label>
+            </div>
           </>
 
           {/* File List */}
