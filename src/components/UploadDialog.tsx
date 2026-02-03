@@ -272,10 +272,8 @@ export function UploadDialog({
   // On Android, htmlFor→click can fail. Trigger the picker programmatically.
   const openFilePicker = useCallback(() => {
     resetFileInput();
-    // Small delay ensures the input is ready after reset (fixes desktop browsers)
-    setTimeout(() => {
-      fileInputRef.current?.click();
-    }, 0);
+    // IMPORTANT: must be synchronous to preserve user-gesture activation on desktop browsers
+    fileInputRef.current?.click();
   }, [resetFileInput]);
 
   const removeFile = (index: number) => {
@@ -513,6 +511,9 @@ export function UploadDialog({
             <div
               role="button"
               tabIndex={0}
+              onPointerDown={resetFileInput}
+              onMouseDown={resetFileInput}
+              onTouchStart={resetFileInput}
               onClick={openFilePicker}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") openFilePicker();
