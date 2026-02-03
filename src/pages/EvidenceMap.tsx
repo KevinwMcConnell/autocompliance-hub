@@ -35,7 +35,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, FileText, Calendar, Clock, Info, Upload, Plus, Trash2 } from "lucide-react";
+import { Search, FileText, Calendar, Clock, Info, Upload, Plus, Trash2, Link2, Unlink } from "lucide-react";
+import { AttachDocumentDialog } from "@/components/AttachDocumentDialog";
 import { toast } from "sonner";
 
 interface EvidenceType {
@@ -82,6 +83,9 @@ export default function EvidenceMap() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [attachDialogOpen, setAttachDialogOpen] = useState(false);
+  const [documentToUnlink, setDocumentToUnlink] = useState<Document | null>(null);
+  const [isUnlinking, setIsUnlinking] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!currentFacility?.id) {
@@ -305,6 +309,44 @@ export default function EvidenceMap() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleUnlinkDocument = async () => {
+    if (!documentToUnlink) return;
+
+    const evidenceItemId = documentToUnlink.evidence_item_id;
+    
+    setIsUnlinking(true);
+    try {
+      const { error } = await supabase
+        .from("documents")
+        .update({ evidence_item_id: null })
+        .eq("id", documentToUnlink.id);
+
+      if (error) throw error;
+
+      // Recompute evidence item status after unlinking
+      if (evidenceItemId) {
+        await recomputeEvidenceItemStatus(evidenceItemId);
+      }
+
+      toast.success("Document unlinked");
+      setDocumentToUnlink(null);
+      fetchData();
+    } catch (error: any) {
+      console.error("Unlink error:", error);
+      toast.error("Failed to unlink document");
+    } finally {
+      setIsUnlinking(false);
+    }
+  };
+
+  const handleAttachComplete = async () => {
+    // Recompute status for the selected evidence item after attaching docs
+    if (selectedItem) {
+      await recomputeEvidenceItemStatus(selectedItem.id);
+    }
+    fetchData();
   };
 
   const getStatusFromItem = (item: EvidenceItem): "ok" | "needs_review" | "due_soon" | "missing" | "overdue" => {
@@ -532,7 +574,18 @@ export default function EvidenceMap() {
 
                 {/* Attached Documents */}
                 <div>
-                  <h4 className="font-medium mb-3 text-foreground">Attached Documents</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-foreground">Attached Documents</h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setAttachDialogOpen(true)}
+                    >
+                      <Link2 className="h-3.5 w-3.5" />
+                      Attach Existing
+                    </Button>
+                  </div>
                   {getDocCountForItem(selectedItem.id) > 0 ? (
                     <div className="space-y-2">
                       {documents
@@ -544,13 +597,13 @@ export default function EvidenceMap() {
                               doc.needs_review ? "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20" : ""
                             }`}
                           >
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-4 w-4 text-primary" />
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-medium text-foreground">{doc.file_name}</p>
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <FileText className="h-4 w-4 text-primary shrink-0" />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-medium text-foreground truncate">{doc.file_name}</p>
                                   {doc.needs_review && (
-                                    <Badge variant="outline" className="text-amber-600 border-amber-500 text-xs">
+                                    <Badge variant="outline" className="text-amber-600 border-amber-500 text-xs shrink-0">
                                       Pending Review
                                     </Badge>
                                   )}
@@ -561,13 +614,22 @@ export default function EvidenceMap() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 shrink-0">
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={() => handleViewDocument(doc.storage_path)}
                               >
                                 View
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                className="text-muted-foreground hover:text-foreground"
+                                onClick={() => setDocumentToUnlink(doc)}
+                                title="Unlink from this evidence item"
+                              >
+                                <Unlink className="h-4 w-4" />
                               </Button>
                               <Button 
                                 variant="ghost" 
@@ -640,6 +702,39 @@ export default function EvidenceMap() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Unlink Confirmation Dialog */}
+      <AlertDialog open={!!documentToUnlink} onOpenChange={(open) => !open && setDocumentToUnlink(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlink Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove "{documentToUnlink?.file_name}" from this evidence item? The document will remain in your facility but won't be attached to any evidence item.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnlinking}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnlinkDocument}
+              disabled={isUnlinking}
+            >
+              {isUnlinking ? "Unlinking..." : "Unlink"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Attach Existing Document Dialog */}
+      {currentFacility && selectedItem && (
+        <AttachDocumentDialog
+          open={attachDialogOpen}
+          onOpenChange={setAttachDialogOpen}
+          facilityId={currentFacility.id}
+          evidenceItemId={selectedItem.id}
+          evidenceItemName={selectedItem.evidence_type?.name || "Evidence Item"}
+          onAttachComplete={handleAttachComplete}
+        />
+      )}
     </div>
   );
 }
