@@ -272,7 +272,10 @@ export function UploadDialog({
   // On Android, htmlFor→click can fail. Trigger the picker programmatically.
   const openFilePicker = useCallback(() => {
     resetFileInput();
-    fileInputRef.current?.click();
+    // Small delay ensures the input is ready after reset (fixes desktop browsers)
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 0);
   }, [resetFileInput]);
 
   const removeFile = (index: number) => {
