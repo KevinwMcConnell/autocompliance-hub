@@ -202,38 +202,7 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Handle file input change - reset input value after reading files
-  const handleFileInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement> | React.FormEvent<HTMLInputElement>) => {
-      const input = e.currentTarget;
-      const fileList = (input as HTMLInputElement).files;
-      const selectedFiles = Array.from(fileList || []).slice(0, MAX_FILES_PER_QUEUE);
-
-      // iOS Safari can occasionally fire an event with an empty FileList right after
-      // the picker closes. If we clear the input in that case, we can accidentally
-      // wipe out the real selection before the next event arrives.
-      if (selectedFiles.length === 0) {
-        return;
-      }
-
-      // De-dupe (some browsers can fire both input + change)
-      const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
-      const now = Date.now();
-      // Some browsers fire both input + change; keep a VERY short dedupe window
-      // so we don't block users from intentionally selecting the same file again.
-      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 250) {
-        (input as HTMLInputElement).value = "";
-        return;
-      }
-      lastPickRef.current = { sig, ts: now };
-
-      addFiles(selectedFiles);
-
-      // Reset input immediately so same file can be selected again (iOS fix)
-      (input as HTMLInputElement).value = "";
-    },
-    [addFiles]
-  );
+  // (handleFileInput removed — single native "change" listener handles everything)
 
   // Native event listener fallback (iOS Safari AND Android Chrome can both miss React synthetic events)
   useEffect(() => {
@@ -247,6 +216,7 @@ export function UploadDialog({
 
       // Ignore empty events (some browsers fire spurious ones)
       if (selectedFiles.length === 0) {
+        console.log("[UploadDialog] Picker returned 0 files (cancelled or empty)");
         return;
       }
 
@@ -262,19 +232,20 @@ export function UploadDialog({
     };
 
     input.addEventListener("change", handler, { capture: true });
-    input.addEventListener("input", handler, { capture: true });
     return () => {
       input.removeEventListener("change", handler, { capture: true });
-      input.removeEventListener("input", handler, { capture: true });
     };
   }, [addFiles]);
 
   // On Android, htmlFor→click can fail. Trigger the picker programmatically.
   const openFilePicker = useCallback(() => {
     resetFileInput();
+    console.log("[UploadDialog] Opening picker:", {
+      facilityId, evidenceItemId, accept: ACCEPT_ATTRIBUTE, multiple: true
+    });
     // IMPORTANT: must be synchronous to preserve user-gesture activation on desktop browsers
     fileInputRef.current?.click();
-  }, [resetFileInput]);
+  }, [resetFileInput, facilityId, evidenceItemId]);
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -288,6 +259,11 @@ export function UploadDialog({
 
     const uuid = crypto.randomUUID();
     const storagePath = `${facilityId}/${uuid}-${file.name}`;
+
+    console.log("[Upload] Starting:", {
+      facilityId, evidenceItemId: evidenceItemId || "(none)",
+      storagePath, fileName: file.name, fileSize: file.size, fileType: file.type
+    });
 
     try {
       setFiles((prev) =>
@@ -303,7 +279,10 @@ export function UploadDialog({
           upsert: false,
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        toast.error(`Storage upload failed: ${uploadError.message}`);
+        throw uploadError;
+      }
 
       setFiles((prev) =>
         prev.map((f, i) => (i === index ? { ...f, progress: 60 } : f))
@@ -337,7 +316,10 @@ export function UploadDialog({
         .select("id")
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        toast.error(`Database insert failed: ${insertError.message}`);
+        throw insertError;
+      }
 
       setFiles((prev) =>
         prev.map((f, i) =>
@@ -495,7 +477,7 @@ export function UploadDialog({
               multiple
               accept={ACCEPT_ATTRIBUTE}
               disabled={isUploading}
-              key={open ? "open" : "closed"}
+              
               style={{
                 position: "fixed",
                 top: "-9999px",
@@ -551,6 +533,20 @@ export function UploadDialog({
                     PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                   </p>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openFilePicker();
+                  }}
+                  disabled={isUploading}
+                  className="mt-2"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Choose files
+                </Button>
               </div>
             </div>
           </>
