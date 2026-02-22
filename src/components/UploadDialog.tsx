@@ -202,40 +202,26 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // (handleFileInput removed — single native "change" listener handles everything)
+  // Single React onChange handler — no native addEventListener
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selected = Array.from(e.target.files || []);
+      console.log("[UploadDialog] onChange fired", {
+        count: selected.length,
+        names: selected.map((f) => f.name),
+      });
 
-  // Native event listener fallback (iOS Safari AND Android Chrome can both miss React synthetic events)
-  useEffect(() => {
-    const input = fileInputRef.current;
-    if (!input) return;
-
-    const handler = (e: Event) => {
-      // Immediately capture before any browser quirks clear it
-      const files = (e.target as HTMLInputElement).files;
-      const selectedFiles = Array.from(files || []).slice(0, MAX_FILES_PER_QUEUE);
-
-      // Ignore empty events (some browsers fire spurious ones)
-      if (selectedFiles.length === 0) {
+      if (selected.length === 0) {
         console.log("[UploadDialog] Picker returned 0 files (cancelled or empty)");
         return;
       }
 
-      const sig = selectedFiles.map((f) => `${f.name}:${f.size}`).join("|");
-      const now = Date.now();
-      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 250) {
-        input.value = "";
-        return;
-      }
-      lastPickRef.current = { sig, ts: now };
-      addFiles(selectedFiles);
-      input.value = "";
-    };
-
-    input.addEventListener("change", handler, { capture: true });
-    return () => {
-      input.removeEventListener("change", handler, { capture: true });
-    };
-  }, [addFiles]);
+      addFiles(selected);
+      // Reset so the same file can be selected again
+      e.target.value = "";
+    },
+    [addFiles]
+  );
 
   // On Android, htmlFor→click can fail. Trigger the picker programmatically.
   const openFilePicker = useCallback(() => {
@@ -477,7 +463,7 @@ export function UploadDialog({
               multiple
               accept={ACCEPT_ATTRIBUTE}
               disabled={isUploading}
-              
+              onChange={handleFileInput}
               style={{
                 position: "fixed",
                 top: "-9999px",
