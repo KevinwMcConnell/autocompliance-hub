@@ -202,11 +202,18 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Single React onChange handler — no native addEventListener
-  const handleFileInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = Array.from(e.target.files || []);
-      console.log("[UploadDialog] onChange fired", {
+  // Native event listener — more reliable on tablets (iOS Safari, Android Chrome)
+  // where React synthetic onChange can be missed. Uses capture phase to read
+  // FileList before the browser clears it.
+  useEffect(() => {
+    const input = fileInputRef.current;
+    if (!input) return;
+
+    const handler = (e: Event) => {
+      const files = (e.target as HTMLInputElement).files;
+      const selected = Array.from(files || []).slice(0, MAX_FILES_PER_QUEUE);
+
+      console.log("[UploadDialog] change (native) fired", {
         count: selected.length,
         names: selected.map((f) => f.name),
       });
@@ -216,12 +223,24 @@ export function UploadDialog({
         return;
       }
 
+      // De-duplicate: prevent double-fire on browsers that trigger both native + React
+      const sig = selected.map((f) => `${f.name}:${f.size}`).join("|");
+      const now = Date.now();
+      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 500) {
+        input.value = "";
+        return;
+      }
+      lastPickRef.current = { sig, ts: now };
+
       addFiles(selected);
-      // Reset so the same file can be selected again
-      e.target.value = "";
-    },
-    [addFiles]
-  );
+      input.value = "";
+    };
+
+    input.addEventListener("change", handler, { capture: true });
+    return () => {
+      input.removeEventListener("change", handler, { capture: true });
+    };
+  }, [addFiles]);
 
   // On Android, htmlFor→click can fail. Trigger the picker programmatically.
   const openFilePicker = useCallback(() => {
@@ -463,7 +482,7 @@ export function UploadDialog({
               multiple
               accept={ACCEPT_ATTRIBUTE}
               disabled={isUploading}
-              onChange={handleFileInput}
+              // onChange handled by native listener in useEffect for tablet reliability
               style={{
                 position: "fixed",
                 top: "-9999px",
