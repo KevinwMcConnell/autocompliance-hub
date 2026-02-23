@@ -86,18 +86,16 @@ export function UploadDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const lastPickRef = useRef<{ sig: string; ts: number }>({ sig: "", ts: 0 });
-
   // Avoid side-effects inside setState updaters; keep a lightweight ref of current queue length.
   const filesCountRef = useRef(0);
   useEffect(() => {
     filesCountRef.current = files.length;
   }, [files.length]);
   
-  // Ref to file input for iOS compatibility (reset before each pick)
+  // Ref to file input for resetting value
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset file input value - critical for iOS to allow selecting same file twice
+  // Reset file input value - critical for allowing same file to be selected again
   const resetFileInput = useCallback(() => {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -117,7 +115,7 @@ export function UploadDialog({
     resetFileInput();
   }, [resetFileInput]);
 
-  // Handle dialog close (X button or backdrop click)
+  // Handle dialog close
   const handleOpenChange = useCallback(
     (newOpen: boolean) => {
       if (!newOpen) {
@@ -128,7 +126,7 @@ export function UploadDialog({
     [onOpenChange, resetState]
   );
 
-  // Also reset input whenever the dialog opens (prevents stale picker state on iOS)
+  // Reset input whenever the dialog opens
   useEffect(() => {
     if (open) resetFileInput();
   }, [open, resetFileInput]);
@@ -138,15 +136,12 @@ export function UploadDialog({
     const valid: File[] = [];
 
     for (const file of newFiles) {
-      // Check file size
       if (file.size > MAX_FILE_SIZE_BYTES) {
         toast.error(
           `"${file.name}" is too large (${formatFileSize(file.size)}). Maximum size is 20MB.`
         );
         continue;
       }
-
-      // Check file type with detailed error
       if (!isAcceptedFile(file)) {
         const typeInfo = file.type ? ` (type: ${file.type})` : " (no type detected)";
         toast.error(
@@ -154,7 +149,6 @@ export function UploadDialog({
         );
         continue;
       }
-
       valid.push(file);
     }
 
@@ -202,55 +196,21 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Native event listener — more reliable on tablets (iOS Safari, Android Chrome)
-  // where React synthetic onChange can be missed. Uses capture phase to read
-  // FileList before the browser clears it.
-  useEffect(() => {
-    const input = fileInputRef.current;
-    if (!input) return;
-
-    const handler = (e: Event) => {
-      const files = (e.target as HTMLInputElement).files;
-      const selected = Array.from(files || []).slice(0, MAX_FILES_PER_QUEUE);
-
-      console.log("[UploadDialog] change (native) fired", {
+  // Single React onChange handler — no native listeners, no programmatic .click()
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selected = Array.from(e.currentTarget.files || []).slice(0, MAX_FILES_PER_QUEUE);
+      console.log("[UploadDialog] onChange fired", {
         count: selected.length,
         names: selected.map((f) => f.name),
       });
-
-      if (selected.length === 0) {
-        console.log("[UploadDialog] Picker returned 0 files (cancelled or empty)");
-        return;
+      if (selected.length > 0) {
+        addFiles(selected);
       }
-
-      // De-duplicate: prevent double-fire on browsers that trigger both native + React
-      const sig = selected.map((f) => `${f.name}:${f.size}`).join("|");
-      const now = Date.now();
-      if (sig && lastPickRef.current.sig === sig && now - lastPickRef.current.ts < 500) {
-        input.value = "";
-        return;
-      }
-      lastPickRef.current = { sig, ts: now };
-
-      addFiles(selected);
-      input.value = "";
-    };
-
-    input.addEventListener("change", handler, { capture: true });
-    return () => {
-      input.removeEventListener("change", handler, { capture: true });
-    };
-  }, [addFiles]);
-
-  // On Android, htmlFor→click can fail. Trigger the picker programmatically.
-  const openFilePicker = useCallback(() => {
-    resetFileInput();
-    console.log("[UploadDialog] Opening picker:", {
-      facilityId, evidenceItemId, accept: ACCEPT_ATTRIBUTE, multiple: true
-    });
-    // IMPORTANT: must be synchronous to preserve user-gesture activation on desktop browsers
-    fileInputRef.current?.click();
-  }, [resetFileInput, facilityId, evidenceItemId]);
+      e.currentTarget.value = "";
+    },
+    [addFiles]
+  );
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
@@ -491,6 +451,7 @@ export function UploadDialog({
                 multiple
                 accept={ACCEPT_ATTRIBUTE}
                 disabled={isUploading}
+                onChange={handleFileChange}
                 className="sr-only"
               />
               <div className="flex flex-col items-center gap-2 text-center">
