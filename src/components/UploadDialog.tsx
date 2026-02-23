@@ -463,48 +463,16 @@ export function UploadDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Dropzone (always visible so users can keep adding files) */}
+          {/* Dropzone — uses <label> so tapping natively opens file picker on all devices */}
           <>
-            {/* 
-              File input - visually hidden but NOT display:none.
-              iOS Safari ignores programmatic clicks on display:none inputs.
-              Using sr-only-like styles keeps it in DOM and accessible.
+            {/*
+              File input — visually hidden with clip-based hiding (NOT display:none
+              or position:fixed off-screen, which tablets can ignore).
+              Wrapped in a <label> so taps natively activate the input without
+              needing programmatic .click() which tablets often block.
             */}
-            {/* 
-              Android Chrome: We attach a native click handler that immediately reads
-              the FileList before Android can clear it. Also avoid opacity: 0 by using
-              a transparent background and offscreen positioning. 
-            */}
-            <input
-              id={inputId}
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept={ACCEPT_ATTRIBUTE}
-              disabled={isUploading}
-              // onChange handled by native listener in useEffect for tablet reliability
-              style={{
-                position: "fixed",
-                top: "-9999px",
-                left: "-9999px",
-                width: "1px",
-                height: "1px",
-              }}
-            />
-            {/* 
-              Use onClick to trigger picker programmatically (Android Chrome often ignores htmlFor). 
-              Also listen for drag-and-drop.
-            */}
-            <div
-              role="button"
-              tabIndex={0}
-              onPointerDown={resetFileInput}
-              onMouseDown={resetFileInput}
-              onTouchStart={resetFileInput}
-              onClick={openFilePicker}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") openFilePicker();
-              }}
+            <label
+              htmlFor={inputId}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -516,6 +484,15 @@ export function UploadDialog({
                 isUploading && "pointer-events-none opacity-50"
               )}
             >
+              <input
+                id={inputId}
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ACCEPT_ATTRIBUTE}
+                disabled={isUploading}
+                className="sr-only"
+              />
               <div className="flex flex-col items-center gap-2 text-center">
                 <div
                   className={cn(
@@ -538,22 +515,18 @@ export function UploadDialog({
                     PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openFilePicker();
-                  }}
-                  disabled={isUploading}
-                  className="mt-2"
+                <span
+                  className={cn(
+                    "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-8 px-3 mt-2",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    isUploading && "opacity-50 pointer-events-none"
+                  )}
                 >
-                  <Upload className="h-4 w-4 mr-2" />
+                  <Upload className="h-4 w-4" />
                   Choose files
-                </Button>
+                </span>
               </div>
-            </div>
+            </label>
           </>
 
           {/* File List */}
