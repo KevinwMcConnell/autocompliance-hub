@@ -410,7 +410,7 @@ export function UploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {evidenceItemId ? "Upload Evidence Document" : "Upload Documents"}
@@ -436,6 +436,12 @@ export function UploadDialog({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
+              onPointerDownCapture={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.tagName === 'INPUT' && target.getAttribute('type') === 'file') {
+                  e.stopPropagation();
+                }
+              }}
               className={cn(
                 "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer select-none",
                 isDragging
@@ -455,6 +461,11 @@ export function UploadDialog({
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => {
+                  e.stopPropagation();
+                  const input = e.currentTarget;
+                  requestAnimationFrame(() => input.click());
+                }}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 style={{ fontSize: "16px" }}
                 tabIndex={-1}
