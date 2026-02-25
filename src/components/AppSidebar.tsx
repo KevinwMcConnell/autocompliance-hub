@@ -26,8 +26,8 @@ import {
 
 const navigation = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Evidence Map", url: "/evidence", icon: FileSearch },
   { title: "Upload Inbox", url: "/uploads", icon: Upload },
+  { title: "Evidence Map", url: "/evidence", icon: FileSearch },
   { title: "Tasks", url: "/tasks", icon: CheckSquare },
   { title: "Exports", url: "/exports", icon: FileOutput },
   { title: "Settings", url: "/settings", icon: Settings },

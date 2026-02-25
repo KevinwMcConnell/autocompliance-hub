@@ -8,12 +8,14 @@ import { StatusChip } from "@/components/StatusChip";
 import { UploadDialog } from "@/components/UploadDialog";
 import {
   FileOutput,
+  FileSearch,
   AlertTriangle,
   Clock,
   FileText,
   Eye,
   ArrowRight,
   Upload,
+  Info,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -169,18 +171,26 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-          <Button variant="outline" className="gap-2 w-full sm:w-auto" asChild>
+          <Button className="gap-2 w-full sm:w-auto" asChild>
             <Link to="/uploads">
               <Upload className="h-4 w-4" />
               Upload Documents
             </Link>
           </Button>
-          <Button className="gap-2 w-full sm:w-auto" asChild>
-            <Link to="/exports">
-              <FileOutput className="h-4 w-4" />
-              Export Packet
+          <Button variant="outline" className="gap-2 w-full sm:w-auto" asChild>
+            <Link to="/evidence">
+              <FileSearch className="h-4 w-4" />
+              View Evidence Map
             </Link>
           </Button>
+          {okEvidence > 0 && (
+            <Button variant="outline" className="gap-2 w-full sm:w-auto" asChild>
+              <Link to="/exports">
+                <FileOutput className="h-4 w-4" />
+                Export Packet
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -326,11 +336,38 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Quick Upload Card */}
-        <Card className="flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setUploadDialogOpen(true)}>
-          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-          <CardTitle className="text-base font-semibold text-foreground mb-1">Upload Documents</CardTitle>
-          <CardDescription className="text-center">Click to upload compliance documents</CardDescription>
+        {/* Guidance / Next Step Card */}
+        <Card className="flex flex-col items-center justify-center p-6">
+          <Info className="h-8 w-8 text-primary mb-2" />
+          {documents.length === 0 ? (
+            <>
+              <CardTitle className="text-base font-semibold text-foreground mb-1">Get Started</CardTitle>
+              <CardDescription className="text-center mb-4">
+                Upload your compliance documents to begin tracking your inspection readiness.
+              </CardDescription>
+              <Button size="sm" asChild>
+                <Link to="/uploads">
+                  <Upload className="h-4 w-4 mr-1" />
+                  Upload Documents
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <CardTitle className="text-base font-semibold text-foreground mb-1">
+                {needsReviewDocs.length} Documents Need Review
+              </CardTitle>
+              <CardDescription className="text-center mb-4">
+                Review and approve uploaded documents, then attach them to evidence items.
+              </CardDescription>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/uploads">
+                  <Eye className="h-4 w-4 mr-1" />
+                  Review Documents
+                </Link>
+              </Button>
+            </>
+          )}
         </Card>
       </div>
 
