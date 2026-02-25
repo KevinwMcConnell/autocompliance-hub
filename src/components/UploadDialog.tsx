@@ -452,8 +452,12 @@ export function UploadDialog({
                 accept={ACCEPT_ATTRIBUTE}
                 disabled={isUploading}
                 onChange={handleFileChange}
-                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 style={{ fontSize: "16px" }}
+                tabIndex={-1}
               />
               <div className="flex flex-col items-center gap-2 text-center">
                 <div
