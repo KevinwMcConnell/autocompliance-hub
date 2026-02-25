@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useId } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, FileText, X, Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -80,7 +80,7 @@ export function UploadDialog({
   evidenceTypeRecurrenceDays,
   onUploadComplete,
 }: UploadDialogProps) {
-  const inputId = useId();
+  const inputId = "upload-dialog-file-input";
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -452,7 +452,8 @@ export function UploadDialog({
                 accept={ACCEPT_ATTRIBUTE}
                 disabled={isUploading}
                 onChange={handleFileChange}
-                className="sr-only"
+                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                style={{ fontSize: "16px" }}
               />
               <div className="flex flex-col items-center gap-2 text-center">
                 <div
