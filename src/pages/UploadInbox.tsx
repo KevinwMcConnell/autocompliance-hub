@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useFacilities } from "@/hooks/useFacilities";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -16,12 +16,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   FileText,
   CheckCircle2,
   Upload,
   Eye,
   Sparkles,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +41,7 @@ interface Document {
   file_name: string;
   file_size: number;
   file_type: string;
+  storage_path: string;
   uploaded_at: string;
   classification: string | null;
   classification_confidence: number | null;
@@ -51,6 +63,8 @@ export default function UploadInbox() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("needs_review");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!currentFacility?.id) {
@@ -110,6 +124,70 @@ export default function UploadInbox() {
     } catch (error) {
       console.error("Error approving document:", error);
       toast.error("Failed to approve document");
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete) return;
+    setIsDeleting(true);
+
+    try {
+      // Step 1: Delete file from storage
+      const { error: storageError } = await supabase.storage
+        .from("compliance-documents")
+        .remove([documentToDelete.storage_path]);
+
+      if (storageError) {
+        console.error("Storage delete error:", storageError);
+        // Continue to delete DB record even if storage fails
+      }
+
+      // Step 2: Delete database record
+      const { error: dbError } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", documentToDelete.id);
+
+      if (dbError) throw dbError;
+
+      // Step 3: Recompute linked evidence item status if applicable
+      if (documentToDelete.evidence_item_id) {
+        const { data: remainingDocs } = await supabase
+          .from("documents")
+          .select("uploaded_at")
+          .eq("evidence_item_id", documentToDelete.evidence_item_id);
+
+        if (remainingDocs && remainingDocs.length > 0) {
+          const lastReceived = remainingDocs.reduce((latest, doc) =>
+            doc.uploaded_at > latest ? doc.uploaded_at : latest,
+            remainingDocs[0].uploaded_at
+          );
+          await supabase
+            .from("evidence_items")
+            .update({
+              status: "ok",
+              last_received_at: lastReceived,
+            })
+            .eq("id", documentToDelete.evidence_item_id);
+        } else {
+          await supabase
+            .from("evidence_items")
+            .update({
+              status: "missing",
+              last_received_at: null,
+            })
+            .eq("id", documentToDelete.evidence_item_id);
+        }
+      }
+
+      toast.success("Document deleted successfully");
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      toast.error("Failed to delete document");
+    } finally {
+      setIsDeleting(false);
+      setDocumentToDelete(null);
     }
   };
 
@@ -259,6 +337,14 @@ export default function UploadInbox() {
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                             Approve
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDocumentToDelete(doc)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -304,7 +390,17 @@ export default function UploadInbox() {
                               {formatFileSize(doc.file_size)} • Uploaded {formatDate(doc.uploaded_at)}
                             </p>
                           </div>
-                          <StatusChip status="ok" />
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                              onClick={() => setDocumentToDelete(doc)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <StatusChip status="ok" />
+                          </div>
                         </div>
                         {doc.classification && (
                           <div className="mt-2 flex items-center gap-2">
@@ -342,6 +438,28 @@ export default function UploadInbox() {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!documentToDelete} onOpenChange={(open) => !open && setDocumentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete "{documentToDelete?.file_name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDocument}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Upload Dialog */}
       {currentFacility && (
