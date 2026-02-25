@@ -1,37 +1,78 @@
 
 
-## Add Delete Buttons to Upload Inbox Documents
+## Clean Up Navigation and First-Use Flow
 
-The Upload Inbox page currently has no way to delete documents from either the "Needs Review" or "Processed" tabs. The Evidence Map already has full delete functionality that we can follow as a pattern.
+A focused set of changes to make the workflow obvious: Dashboard -> Upload -> Evidence -> Tasks -> Exports. No schema changes, no logic changes, no routing changes beyond sidebar order.
 
-### Changes
+### Files to modify
 
-**File: `src/pages/UploadInbox.tsx`**
+1. **`src/components/AppSidebar.tsx`** -- Reorder sidebar nav
+2. **`src/pages/Dashboard.tsx`** -- Restructure CTAs and conditionally de-emphasize Export
+3. **`src/pages/EvidenceMap.tsx`** -- Improve empty state and descriptive wording
+4. **`src/pages/Tasks.tsx`** -- Improve empty state wording
+5. **`src/pages/Exports.tsx`** -- Improve empty state and de-emphasize when not ready
 
-1. **Add `storage_path` to the Document interface** -- needed to delete files from storage.
+---
 
-2. **Add state variables** for delete flow:
-   - `documentToDelete` (Document or null)
-   - `isDeleting` (boolean)
+### 1. Sidebar order (`AppSidebar.tsx`)
 
-3. **Add `handleDeleteDocument` function** that:
-   - Deletes the file from the `compliance-documents` storage bucket using `storage_path`
-   - Deletes the database record from `documents` table
-   - Recomputes linked evidence item status if the doc was linked
-   - Refreshes the document list
+Reorder the `navigation` array to match the workflow:
 
-4. **Add a Delete button (trash icon) to each document card** in both tabs:
-   - "Needs Review" tab: add a Trash2 icon button next to the Approve button
-   - "Processed" tab: add a Trash2 icon button in the card's action area
+```text
+Dashboard  ->  Upload Inbox  ->  Evidence Map  ->  Tasks  ->  Exports  ->  Settings
+```
 
-5. **Add an AlertDialog for delete confirmation** -- matching the pattern used in Evidence Map, asking "Are you sure?" before permanently deleting.
+Currently Evidence Map comes before Upload Inbox. Swap them.
 
-6. **Add imports**: `Trash2` from lucide-react, `AlertDialog` components from the UI library.
+---
 
-### Technical Details
+### 2. Dashboard CTAs (`Dashboard.tsx`)
 
-- The delete function follows the same two-step pattern from Evidence Map: delete from storage first, then delete the DB record
-- If the document has an `evidence_item_id`, the linked evidence item's status will be recomputed after deletion (fetch all remaining docs for that item, recalculate status/dates)
-- The confirmation dialog prevents accidental deletions
-- No database migrations needed -- all tables and policies already exist
+**Current**: Two equal buttons -- "Upload Documents" (outline) and "Export Packet" (primary). Export feels like a first action.
+
+**Change**:
+- Make "Upload Documents" the primary CTA (filled button, listed first).
+- Add "View Evidence Map" as a secondary outline button.
+- Show "Export Packet" only when there are approved evidence items (`okEvidence > 0`). When no approved evidence exists, omit the Export button entirely from the header.
+- Remove the duplicate "Quick Upload" dashed card in the middle row -- it competes with the header CTA and the Upload Inbox page. Replace it with a simple info card that says "Next step: Upload your compliance documents to get started" when there are zero documents, or show due-soon summary when data exists.
+
+---
+
+### 3. Evidence Map wording (`EvidenceMap.tsx`)
+
+**Empty state**: Change subtitle from "Track all compliance documents and their status" to "Track required compliance items and attach uploaded documents to them."
+
+**"Add Evidence Item" button**: Change label to "Add Compliance Requirement" so first-time users understand they are creating a requirement to track, not uploading a file.
+
+**Empty state body**: Change from "Upload compliance documents or create an evidence item to start tracking your requirements" to:
+- Primary CTA: "Upload Documents" (links to Upload Inbox)
+- Secondary CTA: "Add Compliance Requirement" -- with helper text: "Create a compliance requirement to track, then attach uploaded documents to it."
+
+---
+
+### 4. Tasks empty state (`Tasks.tsx`)
+
+**Change** the empty state copy from "Add a task to start tracking your compliance requirements" to "Create tasks for compliance work that needs to get done -- inspections, renewals, follow-ups."
+
+Button text stays "Add Your First Task".
+
+---
+
+### 5. Exports page (`Exports.tsx`)
+
+**When evidence items exist but none are "ok"**: Currently shows the full export UI with 0 items selected and the export button disabled. Add a prominent banner at the top explaining: "Your inspection packet isn't ready yet. Upload and approve documents, then attach them to evidence items to include them in your export."
+
+**Empty state** (no evidence items): Already good -- links to Upload Inbox. No change needed.
+
+---
+
+### Summary of improvements
+
+- **Sidebar order** matches real workflow (Upload before Evidence).
+- **Dashboard** makes Upload the obvious first action; Export is hidden until relevant.
+- **Duplicate upload card** on Dashboard replaced with contextual guidance.
+- **Evidence Map** clarifies the distinction between uploading a file vs. creating a requirement.
+- **Tasks** has clearer empty-state guidance.
+- **Exports** explains why it's not ready when no approved evidence exists.
+- Zero functionality removed. Zero schema changes. Zero routing changes.
 
