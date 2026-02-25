@@ -167,6 +167,21 @@ export default function Exports() {
         </Button>
       </div>
 
+      {/* Not-ready banner */}
+      {includedItems.length === 0 && evidenceItems.length > 0 && (
+        <Card className="border-status-due-soon/50 bg-status-due-soon/5">
+          <CardContent className="p-4 flex items-start gap-3">
+            <FileOutput className="h-5 w-5 text-status-due-soon mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-foreground">Your inspection packet isn't ready yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Upload and approve documents, then attach them to evidence items to include them in your export.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Readiness Summary */}
       <Card>
         <CardHeader className="pb-2">

@@ -375,13 +375,13 @@ export default function EvidenceMap() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Evidence Map</h1>
           <p className="text-muted-foreground">
-            Track all compliance documents and their status
+            Track required compliance items and attach uploaded documents to them
           </p>
         </div>
         {evidenceItems.length > 0 && (
           <Button onClick={() => setAddEvidenceOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
-            Add Evidence Item
+            Add Compliance Requirement
           </Button>
         )}
       </div>
@@ -484,8 +484,8 @@ export default function EvidenceMap() {
           <CardContent className="py-16 text-center">
             <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No evidence items yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Upload compliance documents or create an evidence item to start tracking your requirements.
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Create a compliance requirement to track, then attach uploaded documents to it.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button onClick={() => navigate("/uploads")} className="gap-2">
@@ -494,7 +494,7 @@ export default function EvidenceMap() {
               </Button>
               <Button variant="outline" onClick={() => setAddEvidenceOpen(true)} className="gap-2">
                 <Plus className="h-4 w-4" />
-                Create Evidence Item
+                Add Compliance Requirement
               </Button>
             </div>
           </CardContent>

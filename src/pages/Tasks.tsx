@@ -380,7 +380,7 @@ export default function Tasks() {
             <CheckSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No tasks yet</h3>
             <p className="text-muted-foreground mb-6">
-              Add a task to start tracking your compliance requirements.
+              Create tasks for compliance work that needs to get done — inspections, renewals, follow-ups.
             </p>
             <Button onClick={() => setAddTaskDialogOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
