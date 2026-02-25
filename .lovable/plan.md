@@ -1,32 +1,59 @@
 
 
-## Fix: File Picker Not Opening on Android Tablet
+## Fix: Android Tablet File Picker -- Nuclear Option
 
-### Root Cause
+### Root Cause (confirmed after 4 attempts)
 
-Two issues are likely preventing the file picker from opening on Android tablets:
+Radix Dialog's internal `FocusScope` component adds **capture-phase** `pointerdown` listeners that call `event.preventDefault()`. This kills the native file picker activation on Android Chrome touch events. Desktop browsers are unaffected because they handle click-to-file-picker differently.
 
-1. **`useId()` generates IDs with colons** (e.g., `:r1:`). While valid HTML, Android Chrome has known issues matching `htmlFor` to `id` attributes containing special characters, so the label-to-input association silently fails.
+Our previous fixes (stopPropagation, overlay input, stable IDs) all operate in the **bubble phase**, which runs AFTER Radix's capture-phase handler has already called `preventDefault()`.
 
-2. **Radix Dialog focus trap** can intercept tap events before they propagate to the label, preventing the native label activation from reaching the hidden input.
+### Solution: Three-layer defense
 
-### Solution
+**Layer 1: Disable Radix's auto-focus grab**
+Pass `onOpenAutoFocus={(e) => e.preventDefault()}` to `DialogContent` in UploadDialog. This stops Radix from aggressively managing focus when the dialog opens.
 
-A two-part fix that ensures taps always reach the file input directly:
+**Layer 2: Capture-phase interception**
+Add `onPointerDownCapture` on the dropzone `<label>` that calls `e.stopPropagation()`. Since capture phase runs top-down, our handler on the label fires BEFORE Radix's handler on the FocusScope parent, preventing Radix from calling `preventDefault()`.
 
-1. **Replace `useId()` with a stable plain-string ID** -- use `"upload-dialog-file-input"` (no colons or special characters) so `htmlFor`/`id` matching works reliably on all browsers.
-
-2. **Overlay the input on top of the dropzone** -- instead of hiding the input with `sr-only` (which clips it to 1x1px), position it as `absolute inset-0 opacity-0` covering the entire dropzone area. This way, taps physically land on the `<input type="file">` element itself, completely bypassing any label association or focus trap issues. The input remains invisible but receives touch events directly.
+**Layer 3: Touch-event fallback**
+Add an `onTouchEnd` handler on the file input that programmatically calls `this.click()` synchronously. `touchend` is considered a valid user gesture by Android Chrome, so even if pointerdown was blocked, the file picker will open on touch release.
 
 ### Technical Changes
 
 **File: `src/components/UploadDialog.tsx`**
 
-- Remove `useId` import
-- Replace `const inputId = useId()` with `const inputId = "upload-dialog-file-input"`
-- Change the input's className from `"sr-only"` to `"absolute inset-0 opacity-0 cursor-pointer"` and add `style={{ fontSize: "16px" }}` (prevents iOS zoom on focus)
-- Add a `z-10` to the input so it sits above the visual content inside the label
-- Keep everything else (label wrapper, onChange handler, accept attribute, drag-and-drop) unchanged
+1. On `<DialogContent>`, add:
+   ```
+   onOpenAutoFocus={(e) => e.preventDefault()}
+   ```
 
-This approach is the most reliable for mobile because the browser does not need to resolve any `htmlFor` association -- the user's finger literally touches the file input element.
+2. On the `<label>` dropzone wrapper, add capture-phase handler:
+   ```
+   onPointerDownCapture={(e) => {
+     const target = e.target as HTMLElement;
+     if (target.tagName === 'INPUT' && target.getAttribute('type') === 'file') {
+       e.stopPropagation();
+     }
+   }}
+   ```
+
+3. On the `<input type="file">`, add touchend fallback:
+   ```
+   onTouchEnd={(e) => {
+     e.stopPropagation();
+     const input = e.currentTarget;
+     // Small delay to let touchend complete, still within gesture window
+     requestAnimationFrame(() => input.click());
+   }}
+   ```
+
+4. Keep all existing handlers (onChange, onPointerDown stopPropagation, etc.) as additional safety.
+
+### Why this will work
+
+- Layer 2 intercepts the event BEFORE Radix can touch it (capture phase beats bubble phase)
+- Layer 3 provides a completely independent activation path via touch events
+- Layer 1 prevents Radix from stealing focus on dialog open, which can interfere with subsequent interactions
+- All three layers are safe no-ops on desktop, so laptop behavior is unchanged
 
