@@ -1,59 +1,37 @@
 
 
-## Fix: Android Tablet File Picker -- Nuclear Option
+## Add Delete Buttons to Upload Inbox Documents
 
-### Root Cause (confirmed after 4 attempts)
+The Upload Inbox page currently has no way to delete documents from either the "Needs Review" or "Processed" tabs. The Evidence Map already has full delete functionality that we can follow as a pattern.
 
-Radix Dialog's internal `FocusScope` component adds **capture-phase** `pointerdown` listeners that call `event.preventDefault()`. This kills the native file picker activation on Android Chrome touch events. Desktop browsers are unaffected because they handle click-to-file-picker differently.
+### Changes
 
-Our previous fixes (stopPropagation, overlay input, stable IDs) all operate in the **bubble phase**, which runs AFTER Radix's capture-phase handler has already called `preventDefault()`.
+**File: `src/pages/UploadInbox.tsx`**
 
-### Solution: Three-layer defense
+1. **Add `storage_path` to the Document interface** -- needed to delete files from storage.
 
-**Layer 1: Disable Radix's auto-focus grab**
-Pass `onOpenAutoFocus={(e) => e.preventDefault()}` to `DialogContent` in UploadDialog. This stops Radix from aggressively managing focus when the dialog opens.
+2. **Add state variables** for delete flow:
+   - `documentToDelete` (Document or null)
+   - `isDeleting` (boolean)
 
-**Layer 2: Capture-phase interception**
-Add `onPointerDownCapture` on the dropzone `<label>` that calls `e.stopPropagation()`. Since capture phase runs top-down, our handler on the label fires BEFORE Radix's handler on the FocusScope parent, preventing Radix from calling `preventDefault()`.
+3. **Add `handleDeleteDocument` function** that:
+   - Deletes the file from the `compliance-documents` storage bucket using `storage_path`
+   - Deletes the database record from `documents` table
+   - Recomputes linked evidence item status if the doc was linked
+   - Refreshes the document list
 
-**Layer 3: Touch-event fallback**
-Add an `onTouchEnd` handler on the file input that programmatically calls `this.click()` synchronously. `touchend` is considered a valid user gesture by Android Chrome, so even if pointerdown was blocked, the file picker will open on touch release.
+4. **Add a Delete button (trash icon) to each document card** in both tabs:
+   - "Needs Review" tab: add a Trash2 icon button next to the Approve button
+   - "Processed" tab: add a Trash2 icon button in the card's action area
 
-### Technical Changes
+5. **Add an AlertDialog for delete confirmation** -- matching the pattern used in Evidence Map, asking "Are you sure?" before permanently deleting.
 
-**File: `src/components/UploadDialog.tsx`**
+6. **Add imports**: `Trash2` from lucide-react, `AlertDialog` components from the UI library.
 
-1. On `<DialogContent>`, add:
-   ```
-   onOpenAutoFocus={(e) => e.preventDefault()}
-   ```
+### Technical Details
 
-2. On the `<label>` dropzone wrapper, add capture-phase handler:
-   ```
-   onPointerDownCapture={(e) => {
-     const target = e.target as HTMLElement;
-     if (target.tagName === 'INPUT' && target.getAttribute('type') === 'file') {
-       e.stopPropagation();
-     }
-   }}
-   ```
-
-3. On the `<input type="file">`, add touchend fallback:
-   ```
-   onTouchEnd={(e) => {
-     e.stopPropagation();
-     const input = e.currentTarget;
-     // Small delay to let touchend complete, still within gesture window
-     requestAnimationFrame(() => input.click());
-   }}
-   ```
-
-4. Keep all existing handlers (onChange, onPointerDown stopPropagation, etc.) as additional safety.
-
-### Why this will work
-
-- Layer 2 intercepts the event BEFORE Radix can touch it (capture phase beats bubble phase)
-- Layer 3 provides a completely independent activation path via touch events
-- Layer 1 prevents Radix from stealing focus on dialog open, which can interfere with subsequent interactions
-- All three layers are safe no-ops on desktop, so laptop behavior is unchanged
+- The delete function follows the same two-step pattern from Evidence Map: delete from storage first, then delete the DB record
+- If the document has an `evidence_item_id`, the linked evidence item's status will be recomputed after deletion (fetch all remaining docs for that item, recalculate status/dates)
+- The confirmation dialog prevents accidental deletions
+- No database migrations needed -- all tables and policies already exist
 
