@@ -141,32 +141,38 @@ export function UploadDialog({
   }, [open, resetFileInput]);
 
   // Validate and add files with detailed error messages
-  const addFiles = useCallback((newFiles: File[]) => {
+  const addFiles = useCallback((newFiles: File[]): number => {
     const valid: File[] = [];
 
     for (const file of newFiles) {
+      const fileType = file.type || "no type";
+      const fileSize = formatFileSize(file.size);
+
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        toast.error(
-          `"${file.name}" is too large (${formatFileSize(file.size)}). Maximum size is 20MB.`
-        );
+        const message = `Rejected: ${file.name} | type: ${fileType} | size: ${fileSize} | reason: too large (max 20MB)`;
+        toast.error(message);
+        setLastErrorMessage(message);
         continue;
       }
+
       if (!isAcceptedFile(file)) {
-        const typeInfo = file.type ? ` (type: ${file.type})` : " (no type detected)";
-        toast.error(
-          `"${file.name}"${typeInfo} is not an accepted file type. Accepted: PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP.`
-        );
+        const message = `Rejected: ${file.name} | type: ${fileType} | size: ${fileSize} | reason: type not accepted`;
+        toast.error(message);
+        setLastErrorMessage(message);
         continue;
       }
+
       valid.push(file);
     }
 
-    if (valid.length === 0) return;
+    if (valid.length === 0) return 0;
 
     const remaining = Math.max(0, MAX_FILES_PER_QUEUE - filesCountRef.current);
     if (remaining === 0) {
-      toast.error(`You can queue up to ${MAX_FILES_PER_QUEUE} files at a time.`);
-      return;
+      const message = `You can queue up to ${MAX_FILES_PER_QUEUE} files at a time.`;
+      toast.error(message);
+      setLastErrorMessage(message);
+      return 0;
     }
 
     const filesWithStatus: FileWithStatus[] = valid.map((file) => ({
@@ -176,13 +182,14 @@ export function UploadDialog({
     }));
 
     if (filesWithStatus.length > remaining) {
-      toast.error(
-        `Only the first ${remaining} file(s) were added (queue limit: ${MAX_FILES_PER_QUEUE}).`
-      );
+      const message = `Only the first ${remaining} file(s) were added (queue limit: ${MAX_FILES_PER_QUEUE}).`;
+      toast.error(message);
+      setLastErrorMessage(message);
     }
 
     const toAdd = filesWithStatus.slice(0, remaining);
     setFiles((prev) => [...prev, ...toAdd]);
+    return toAdd.length;
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
