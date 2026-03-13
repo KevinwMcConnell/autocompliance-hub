@@ -85,13 +85,18 @@ export function UploadDialog({
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
+  const [lastEventFired, setLastEventFired] = useState<"yes" | "no">("no");
+  const [lastSelectedCount, setLastSelectedCount] = useState(0);
+  const [lastQueuedCount, setLastQueuedCount] = useState(0);
+  const [lastErrorMessage, setLastErrorMessage] = useState("");
+  const showDebugPanel = import.meta.env.DEV;
   const abortControllerRef = useRef<AbortController | null>(null);
   // Avoid side-effects inside setState updaters; keep a lightweight ref of current queue length.
   const filesCountRef = useRef(0);
   useEffect(() => {
     filesCountRef.current = files.length;
   }, [files.length]);
-  
+
   // Ref to file input for resetting value
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,6 +117,10 @@ export function UploadDialog({
     setIsDragging(false);
     setIsUploading(false);
     setApprovingIndex(null);
+    setLastEventFired("no");
+    setLastSelectedCount(0);
+    setLastQueuedCount(0);
+    setLastErrorMessage("");
     resetFileInput();
   }, [resetFileInput]);
 
