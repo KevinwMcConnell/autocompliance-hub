@@ -216,18 +216,29 @@ export function UploadDialog({
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const selected = Array.from(e.currentTarget.files || []).slice(0, MAX_FILES_PER_QUEUE);
-      console.log("[UploadDialog] onChange fired", {
-        count: selected.length,
-        names: selected.map((f) => f.name),
-        types: selected.map((f) => f.type || "no type detected"),
-        sizes: selected.map((f) => f.size),
-      });
+      const count = selected.length;
+      const names = selected.map((f) => f.name);
+      const types = selected.map((f) => f.type || "no type detected");
+      const sizes = selected.map((f) => f.size);
+
+      setLastEventFired("yes");
+      setLastSelectedCount(count);
+      setLastQueuedCount(0);
+      setLastErrorMessage("");
+
+      toast.info(`onChange fired: ${selected.length} file(s)`);
+      console.log("[UploadDialog] onChange fired", { count, names, types, sizes });
+
       if (selected.length > 0) {
-        addFiles(selected);
+        const queuedCount = addFiles(selected);
+        setLastQueuedCount(queuedCount);
+        toast.info(`Queued: ${selected.length} file(s)`);
       } else {
-        // Android sometimes fires onChange with empty file list
-        toast.error("No files were received from the picker. Please try again.");
+        const message = "onChange fired but Android returned 0 files";
+        setLastErrorMessage(message);
+        toast.error(message);
       }
+
       e.currentTarget.value = "";
     },
     [addFiles]
