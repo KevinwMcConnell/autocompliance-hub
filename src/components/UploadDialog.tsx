@@ -441,12 +441,7 @@ export function UploadDialog({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onPointerDownCapture={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.tagName === 'INPUT' && target.getAttribute('type') === 'file') {
-                  e.stopPropagation();
-                }
-              }}
+              
               className={cn(
                 "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer select-none",
                 isDragging
