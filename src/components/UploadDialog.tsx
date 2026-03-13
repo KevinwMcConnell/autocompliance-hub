@@ -458,14 +458,7 @@ export function UploadDialog({
                 accept={ACCEPT_ATTRIBUTE}
                 disabled={isUploading}
                 onChange={handleFileChange}
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
-                onTouchEnd={(e) => {
-                  e.stopPropagation();
-                  const input = e.currentTarget;
-                  requestAnimationFrame(() => input.click());
-                }}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 style={{ fontSize: "16px" }}
                 tabIndex={-1}
