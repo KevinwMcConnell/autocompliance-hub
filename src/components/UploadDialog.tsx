@@ -80,7 +80,7 @@ export function UploadDialog({
   evidenceTypeRecurrenceDays,
   onUploadComplete,
 }: UploadDialogProps) {
-  const inputId = "upload-dialog-file-input";
+  
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
