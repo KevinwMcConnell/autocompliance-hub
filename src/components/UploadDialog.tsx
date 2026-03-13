@@ -263,6 +263,9 @@ export function UploadDialog({
     });
 
     try {
+      toast.info(`Uploading: ${file.name}`);
+      setLastErrorMessage("");
+
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index ? { ...f, status: "uploading", progress: 10 } : f
@@ -277,7 +280,9 @@ export function UploadDialog({
         });
 
       if (uploadError) {
-        toast.error(`Storage upload failed: ${uploadError.message}`);
+        const message = `Storage upload failed: ${uploadError.message}`;
+        toast.error(message);
+        setLastErrorMessage(message);
         throw uploadError;
       }
 
@@ -314,7 +319,9 @@ export function UploadDialog({
         .single();
 
       if (insertError) {
-        toast.error(`Database insert failed: ${insertError.message}`);
+        const message = `DB insert failed: ${insertError.message}`;
+        toast.error(message);
+        setLastErrorMessage(message);
         throw insertError;
       }
 
