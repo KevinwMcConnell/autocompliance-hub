@@ -203,9 +203,14 @@ export function UploadDialog({
       console.log("[UploadDialog] onChange fired", {
         count: selected.length,
         names: selected.map((f) => f.name),
+        types: selected.map((f) => f.type || "no type detected"),
+        sizes: selected.map((f) => f.size),
       });
       if (selected.length > 0) {
         addFiles(selected);
+      } else {
+        // Android sometimes fires onChange with empty file list
+        toast.error("No files were received from the picker. Please try again.");
       }
       e.currentTarget.value = "";
     },
@@ -436,12 +441,7 @@ export function UploadDialog({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onPointerDownCapture={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.tagName === 'INPUT' && target.getAttribute('type') === 'file') {
-                  e.stopPropagation();
-                }
-              }}
+              
               className={cn(
                 "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer select-none",
                 isDragging
@@ -458,14 +458,7 @@ export function UploadDialog({
                 accept={ACCEPT_ATTRIBUTE}
                 disabled={isUploading}
                 onChange={handleFileChange}
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
-                onTouchEnd={(e) => {
-                  e.stopPropagation();
-                  const input = e.currentTarget;
-                  requestAnimationFrame(() => input.click());
-                }}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 style={{ fontSize: "16px" }}
                 tabIndex={-1}
