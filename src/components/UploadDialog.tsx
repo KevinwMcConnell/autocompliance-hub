@@ -80,7 +80,7 @@ export function UploadDialog({
   evidenceTypeRecurrenceDays,
   onUploadComplete,
 }: UploadDialogProps) {
-  const inputId = "upload-dialog-file-input";
+  
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -428,76 +428,79 @@ export function UploadDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Dropzone — uses <label> so tapping natively opens file picker on all devices */}
-          <>
-            {/*
-              File input — visually hidden with clip-based hiding (NOT display:none
-              or position:fixed off-screen, which tablets can ignore).
-              Wrapped in a <label> so taps natively activate the input without
-              needing programmatic .click() which tablets often block.
-            */}
-            <label
-              htmlFor={inputId}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              
-              className={cn(
-                "relative block rounded-lg border-2 border-dashed p-6 transition-all duration-200 cursor-pointer select-none",
-                isDragging
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/50 hover:bg-muted/50",
-                isUploading && "pointer-events-none opacity-50"
-              )}
-            >
-              <input
-                id={inputId}
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept={ACCEPT_ATTRIBUTE}
-                disabled={isUploading}
-                onChange={handleFileChange}
-                onClick={(e) => e.stopPropagation()}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                style={{ fontSize: "16px" }}
-                tabIndex={-1}
-              />
-              <div className="flex flex-col items-center gap-2 text-center">
-                <div
+          {/* Visually hidden file input — clip-based hiding for Android/iOS reliability */}
+          <input
+            id="upload-file-input"
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={ACCEPT_ATTRIBUTE}
+            disabled={isUploading}
+            onChange={handleFileChange}
+            style={{
+              position: "absolute",
+              width: "1px",
+              height: "1px",
+              padding: 0,
+              margin: "-1px",
+              overflow: "hidden",
+              clip: "rect(0,0,0,0)",
+              whiteSpace: "nowrap",
+              border: 0,
+              opacity: 0,
+            }}
+            tabIndex={-1}
+          />
+
+          {/* Dropzone for desktop drag-and-drop only — NOT a click target */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn(
+              "rounded-lg border-2 border-dashed p-6 transition-all duration-200",
+              isDragging
+                ? "border-primary bg-primary/5"
+                : "border-border",
+              isUploading && "pointer-events-none opacity-50"
+            )}
+          >
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div
+                className={cn(
+                  "p-2.5 rounded-full transition-colors",
+                  isDragging ? "bg-primary/20" : "bg-muted"
+                )}
+              >
+                <Upload
                   className={cn(
-                    "p-2.5 rounded-full transition-colors",
-                    isDragging ? "bg-primary/20" : "bg-muted"
+                    "h-5 w-5",
+                    isDragging ? "text-primary" : "text-muted-foreground"
                   )}
-                >
-                  <Upload
-                    className={cn(
-                      "h-5 w-5",
-                      isDragging ? "text-primary" : "text-muted-foreground"
-                    )}
-                  />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground text-sm">
-                    Tap to select files or drop here
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-8 px-3 mt-2",
-                    "hover:bg-accent hover:text-accent-foreground",
-                    isUploading && "opacity-50 pointer-events-none"
-                  )}
-                >
-                  <Upload className="h-4 w-4" />
-                  Choose files
-                </span>
+                />
               </div>
-            </label>
-          </>
+              <div>
+                <p className="font-medium text-foreground text-sm">
+                  Drop files here or use the button below
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
+                </p>
+              </div>
+              {/* Label acts as native button — reliable on Android/iOS */}
+              <label
+                htmlFor="upload-file-input"
+                className={cn(
+                  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-9 px-4 mt-2 cursor-pointer select-none",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  isUploading && "opacity-50 pointer-events-none"
+                )}
+              >
+                <Upload className="h-4 w-4" />
+                Choose files
+              </label>
+            </div>
+          </div>
 
           {/* File List */}
           {files.length > 0 && (
