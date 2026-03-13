@@ -203,9 +203,14 @@ export function UploadDialog({
       console.log("[UploadDialog] onChange fired", {
         count: selected.length,
         names: selected.map((f) => f.name),
+        types: selected.map((f) => f.type || "no type detected"),
+        sizes: selected.map((f) => f.size),
       });
       if (selected.length > 0) {
         addFiles(selected);
+      } else {
+        // Android sometimes fires onChange with empty file list
+        toast.error("No files were received from the picker. Please try again.");
       }
       e.currentTarget.value = "";
     },
