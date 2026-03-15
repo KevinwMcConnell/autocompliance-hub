@@ -231,6 +231,18 @@ export function UploadDialog({
       console.log(`[UploadDialog] ${source} fired`, { count, names, types, sizes });
 
       if (selected.length > 0) {
+        const signature = selected
+          .map((f) => `${f.name}:${f.size}:${f.lastModified}`)
+          .join("|");
+        const last = lastProcessedSelectionRef.current;
+        if (last && last.signature === signature && Date.now() - last.at < 750) {
+          console.log("[UploadDialog] Duplicate file event ignored", { source, signature });
+          input.value = "";
+          return;
+        }
+
+        lastProcessedSelectionRef.current = { signature, at: Date.now() };
+
         const queuedCount = addFiles(selected);
         setLastQueuedCount(queuedCount);
         toast.info(`Queued: ${queuedCount} file(s)`);
