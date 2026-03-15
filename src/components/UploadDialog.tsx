@@ -114,6 +114,7 @@ export function UploadDialog({
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    lastProcessedSelectionRef.current = null;
     setFiles([]);
     setIsDragging(false);
     setIsUploading(false);
