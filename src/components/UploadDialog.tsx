@@ -91,6 +91,7 @@ export function UploadDialog({
   const [lastErrorMessage, setLastErrorMessage] = useState("");
   const showDebugPanel = import.meta.env.DEV;
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastProcessedSelectionRef = useRef<{ signature: string; at: number } | null>(null);
   // Avoid side-effects inside setState updaters; keep a lightweight ref of current queue length.
   const filesCountRef = useRef(0);
   useEffect(() => {
@@ -113,6 +114,7 @@ export function UploadDialog({
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    lastProcessedSelectionRef.current = null;
     setFiles([]);
     setIsDragging(false);
     setIsUploading(false);
@@ -212,10 +214,10 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Single React onChange handler — no native listeners, no programmatic .click()
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = Array.from(e.currentTarget.files || []).slice(0, MAX_FILES_PER_QUEUE);
+  // Shared file processing used by both onChange and onInput for mobile browser resilience
+  const processPickedFiles = useCallback(
+    (input: HTMLInputElement, source: "onChange" | "onInput") => {
+      const selected = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
       const count = selected.length;
       const names = selected.map((f) => f.name);
       const types = selected.map((f) => f.type || "no type detected");
@@ -226,22 +228,49 @@ export function UploadDialog({
       setLastQueuedCount(0);
       setLastErrorMessage("");
 
-      toast.info(`onChange fired: ${selected.length} file(s)`);
-      console.log("[UploadDialog] onChange fired", { count, names, types, sizes });
+      toast.info(`${source} fired: ${selected.length} file(s)`);
+      console.log(`[UploadDialog] ${source} fired`, { count, names, types, sizes });
 
       if (selected.length > 0) {
+        const signature = selected
+          .map((f) => `${f.name}:${f.size}:${f.lastModified}`)
+          .join("|");
+        const last = lastProcessedSelectionRef.current;
+        if (last && last.signature === signature && Date.now() - last.at < 750) {
+          console.log("[UploadDialog] Duplicate file event ignored", { source, signature });
+          input.value = "";
+          return;
+        }
+
+        lastProcessedSelectionRef.current = { signature, at: Date.now() };
+
         const queuedCount = addFiles(selected);
         setLastQueuedCount(queuedCount);
-        toast.info(`Queued: ${selected.length} file(s)`);
+        toast.info(`Queued: ${queuedCount} file(s)`);
       } else {
-        const message = "onChange fired but Android returned 0 files";
+        const message = `${source} fired but mobile browser returned 0 files`;
         setLastErrorMessage(message);
         toast.error(message);
       }
 
-      e.currentTarget.value = "";
+      // Always reset so selecting the same file again triggers events
+      input.value = "";
     },
     [addFiles]
+  );
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      processPickedFiles(e.currentTarget, "onChange");
+    },
+    [processPickedFiles]
+  );
+
+  const handleFileInput = useCallback(
+    (e: React.FormEvent<HTMLInputElement>) => {
+      processPickedFiles(e.currentTarget, "onInput");
+    },
+    [processPickedFiles]
   );
 
   const removeFile = (index: number) => {
@@ -463,7 +492,7 @@ export function UploadDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Mobile-safe native file input is now directly tappable in the chooser button below */}
+          {/* Mobile-safe file selection + desktop drag-and-drop */}
 
           {/* Dropzone for desktop drag-and-drop only — NOT a click target */}
           <div
@@ -500,27 +529,30 @@ export function UploadDialog({
                   PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                 </p>
               </div>
-              {/* Direct native input tap target to improve mobile/tablet onChange reliability */}
-              <div
+              {/* Restored stable mobile pattern: label-triggered native file input (visually hidden, not display:none) */}
+              <input
+                ref={fileInputRef}
+                id="upload-dialog-file-input"
+                type="file"
+                multiple
+                accept={ACCEPT_ATTRIBUTE}
+                disabled={isUploading}
+                onChange={handleFileChange}
+                onInput={handleFileInput}
+                className="sr-only"
+                aria-label="Choose files to upload"
+              />
+              <label
+                htmlFor="upload-dialog-file-input"
                 className={cn(
-                  "relative inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-9 px-4 mt-2 select-none",
+                  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-9 px-4 mt-2 select-none cursor-pointer",
                   "hover:bg-accent hover:text-accent-foreground",
                   isUploading && "opacity-50 pointer-events-none"
                 )}
               >
                 <Upload className="h-4 w-4" />
                 Choose files
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept={ACCEPT_ATTRIBUTE}
-                  disabled={isUploading}
-                  onChange={handleFileChange}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  aria-label="Choose files to upload"
-                />
-              </div>
+              </label>
             </div>
           </div>
 
