@@ -463,29 +463,7 @@ export function UploadDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Visually hidden file input — clip-based hiding for Android/iOS reliability */}
-          <input
-            id="upload-file-input"
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={ACCEPT_ATTRIBUTE}
-            disabled={isUploading}
-            onChange={handleFileChange}
-            style={{
-              position: "absolute",
-              width: "1px",
-              height: "1px",
-              padding: 0,
-              margin: "-1px",
-              overflow: "hidden",
-              clip: "rect(0,0,0,0)",
-              whiteSpace: "nowrap",
-              border: 0,
-              opacity: 0,
-            }}
-            tabIndex={-1}
-          />
+          {/* Mobile-safe native file input is now directly tappable in the chooser button below */}
 
           {/* Dropzone for desktop drag-and-drop only — NOT a click target */}
           <div
