@@ -91,6 +91,7 @@ export function UploadDialog({
   const [lastErrorMessage, setLastErrorMessage] = useState("");
   const showDebugPanel = import.meta.env.DEV;
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastProcessedSelectionRef = useRef<{ signature: string; at: number } | null>(null);
   // Avoid side-effects inside setState updaters; keep a lightweight ref of current queue length.
   const filesCountRef = useRef(0);
   useEffect(() => {
