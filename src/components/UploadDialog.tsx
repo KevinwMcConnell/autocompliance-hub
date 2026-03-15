@@ -478,7 +478,7 @@ export function UploadDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Mobile-safe native file input is now directly tappable in the chooser button below */}
+          {/* Mobile-safe file selection + desktop drag-and-drop */}
 
           {/* Dropzone for desktop drag-and-drop only — NOT a click target */}
           <div
