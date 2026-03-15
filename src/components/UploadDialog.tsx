@@ -500,18 +500,27 @@ export function UploadDialog({
                   PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                 </p>
               </div>
-              {/* Label acts as native button — reliable on Android/iOS */}
-              <label
-                htmlFor="upload-file-input"
+              {/* Direct native input tap target to improve mobile/tablet onChange reliability */}
+              <div
                 className={cn(
-                  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-9 px-4 mt-2 cursor-pointer select-none",
+                  "relative inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-9 px-4 mt-2 select-none",
                   "hover:bg-accent hover:text-accent-foreground",
                   isUploading && "opacity-50 pointer-events-none"
                 )}
               >
                 <Upload className="h-4 w-4" />
                 Choose files
-              </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ACCEPT_ATTRIBUTE}
+                  disabled={isUploading}
+                  onChange={handleFileChange}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  aria-label="Choose files to upload"
+                />
+              </div>
             </div>
           </div>
 
