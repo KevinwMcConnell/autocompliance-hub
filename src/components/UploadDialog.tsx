@@ -525,7 +525,7 @@ export function UploadDialog({
                 disabled={isUploading}
                 onChange={handleFileChange}
                 onInput={handleFileInput}
-                className="absolute h-px w-px overflow-hidden whitespace-nowrap border-0 p-0 [-webkit-clip-path:inset(50%)] [clip:rect(0,0,0,0)]"
+                className="sr-only"
                 aria-label="Choose files to upload"
               />
               <label
