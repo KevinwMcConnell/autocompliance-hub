@@ -212,10 +212,10 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Single React onChange handler — no native listeners, no programmatic .click()
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = Array.from(e.currentTarget.files || []).slice(0, MAX_FILES_PER_QUEUE);
+  // Shared file processing used by both onChange and onInput for mobile browser resilience
+  const processPickedFiles = useCallback(
+    (input: HTMLInputElement, source: "onChange" | "onInput") => {
+      const selected = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
       const count = selected.length;
       const names = selected.map((f) => f.name);
       const types = selected.map((f) => f.type || "no type detected");
@@ -226,22 +226,37 @@ export function UploadDialog({
       setLastQueuedCount(0);
       setLastErrorMessage("");
 
-      toast.info(`onChange fired: ${selected.length} file(s)`);
-      console.log("[UploadDialog] onChange fired", { count, names, types, sizes });
+      toast.info(`${source} fired: ${selected.length} file(s)`);
+      console.log(`[UploadDialog] ${source} fired`, { count, names, types, sizes });
 
       if (selected.length > 0) {
         const queuedCount = addFiles(selected);
         setLastQueuedCount(queuedCount);
-        toast.info(`Queued: ${selected.length} file(s)`);
+        toast.info(`Queued: ${queuedCount} file(s)`);
       } else {
-        const message = "onChange fired but Android returned 0 files";
+        const message = `${source} fired but mobile browser returned 0 files`;
         setLastErrorMessage(message);
         toast.error(message);
       }
 
-      e.currentTarget.value = "";
+      // Always reset so selecting the same file again triggers events
+      input.value = "";
     },
     [addFiles]
+  );
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      processPickedFiles(e.currentTarget, "onChange");
+    },
+    [processPickedFiles]
+  );
+
+  const handleFileInput = useCallback(
+    (e: React.FormEvent<HTMLInputElement>) => {
+      processPickedFiles(e.currentTarget, "onInput");
+    },
+    [processPickedFiles]
   );
 
   const removeFile = (index: number) => {
