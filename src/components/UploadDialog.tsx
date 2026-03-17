@@ -536,17 +536,16 @@ export function UploadDialog({
                 style={{ position: "fixed", top: "-9999px", left: "-9999px", width: "1px", height: "1px", opacity: 0 }}
                 aria-label="Choose files to upload"
               />
-              <label
-                htmlFor="upload-dialog-file-input"
-                className={cn(
-                  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium rounded-md border border-input bg-background shadow-xs h-9 px-4 mt-2 select-none cursor-pointer",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  isUploading && "opacity-50 pointer-events-none"
-                )}
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2"
+                disabled={isUploading}
+                onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
               >
-                <Upload className="h-4 w-4" />
+                <Upload className="h-4 w-4 mr-2" />
                 Choose files
-              </label>
+              </Button>
             </div>
           </div>
 
