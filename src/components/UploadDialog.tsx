@@ -144,14 +144,12 @@ export function UploadDialog({
       if (file.size > MAX_FILE_SIZE_BYTES) {
         const message = `Rejected: ${file.name} | type: ${fileType} | size: ${file.size} bytes (${fileSize}) | reason: too large`;
         toast.error(message);
-        setLastErrorMessage(message);
         continue;
       }
 
       if (!isAcceptedFile(file)) {
         const message = `Rejected: ${file.name} | type: ${fileType} | size: ${file.size} bytes (${fileSize}) | reason: type not accepted`;
         toast.error(message);
-        setLastErrorMessage(message);
         continue;
       }
 
