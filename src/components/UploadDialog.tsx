@@ -518,7 +518,7 @@ export function UploadDialog({
                 variant="outline"
                 className="mt-2"
                 disabled={isUploading}
-                onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+                onClick={() => { setTimeout(() => { if (!isUploading) fileInputRef.current?.click(); }, 0); }}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Choose files
