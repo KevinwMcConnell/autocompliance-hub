@@ -114,10 +114,6 @@ export function UploadDialog({
     setIsDragging(false);
     setIsUploading(false);
     setApprovingIndex(null);
-    setLastEventFired("no");
-    setLastSelectedCount(0);
-    setLastQueuedCount(0);
-    setLastErrorMessage("");
     resetFileInput();
   }, [resetFileInput]);
 
