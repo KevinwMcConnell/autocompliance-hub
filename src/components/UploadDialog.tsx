@@ -216,11 +216,6 @@ export function UploadDialog({
       const types = selected.map((f) => f.type || "no type detected");
       const sizes = selected.map((f) => f.size);
 
-      setLastEventFired("yes");
-      setLastSelectedCount(count);
-      setLastQueuedCount(0);
-      setLastErrorMessage("");
-
       console.log(`[UploadDialog] ${source} fired`, { count, names, types, sizes });
 
       const signature = selected
