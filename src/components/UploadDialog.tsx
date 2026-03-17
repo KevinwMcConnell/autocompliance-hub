@@ -218,6 +218,12 @@ export function UploadDialog({
   const processPickedFiles = useCallback(
     (input: HTMLInputElement, source: "onChange" | "onInput") => {
       const selected = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
+      input.value = "";
+
+      if (selected.length === 0) {
+        return;
+      }
+
       const count = selected.length;
       const names = selected.map((f) => f.name);
       const types = selected.map((f) => f.type || "no type detected");
@@ -228,33 +234,21 @@ export function UploadDialog({
       setLastQueuedCount(0);
       setLastErrorMessage("");
 
-      toast.info(`${source} fired: ${selected.length} file(s)`);
       console.log(`[UploadDialog] ${source} fired`, { count, names, types, sizes });
 
-      if (selected.length > 0) {
-        const signature = selected
-          .map((f) => `${f.name}:${f.size}:${f.lastModified}`)
-          .join("|");
-        const last = lastProcessedSelectionRef.current;
-        if (last && last.signature === signature && Date.now() - last.at < 750) {
-          console.log("[UploadDialog] Duplicate file event ignored", { source, signature });
-          input.value = "";
-          return;
-        }
-
-        lastProcessedSelectionRef.current = { signature, at: Date.now() };
-
-        const queuedCount = addFiles(selected);
-        setLastQueuedCount(queuedCount);
-        toast.info(`Queued: ${queuedCount} file(s)`);
-      } else {
-        const message = `${source} fired but mobile browser returned 0 files`;
-        setLastErrorMessage(message);
-        toast.error(message);
+      const signature = selected
+        .map((f) => `${f.name}:${f.size}:${f.lastModified}`)
+        .join("|");
+      const last = lastProcessedSelectionRef.current;
+      if (last && last.signature === signature && Date.now() - last.at < 750) {
+        console.log("[UploadDialog] Duplicate file event ignored", { source, signature });
+        return;
       }
 
-      // Always reset so selecting the same file again triggers events
-      input.value = "";
+      lastProcessedSelectionRef.current = { signature, at: Date.now() };
+
+      const queuedCount = addFiles(selected);
+      setLastQueuedCount(queuedCount);
     },
     [addFiles]
   );
