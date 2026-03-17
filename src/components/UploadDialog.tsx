@@ -449,7 +449,20 @@ export function UploadDialog({
   const showApprovalFlow = evidenceItemId && successFiles.length > 0 && !isUploading;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <>
+      <input
+        ref={fileInputRef}
+        id="upload-dialog-file-input"
+        type="file"
+        multiple
+        accept={ACCEPT_ATTRIBUTE}
+        disabled={isUploading}
+        onChange={handleFileChange}
+        onInput={handleFileInput}
+        style={{ display: 'none' }}
+        aria-label="Choose files to upload"
+      />
+      <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-foreground">
