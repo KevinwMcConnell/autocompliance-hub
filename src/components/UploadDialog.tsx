@@ -513,25 +513,12 @@ export function UploadDialog({
                   PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                 </p>
               </div>
-              {/* Restored stable mobile pattern: label-triggered native file input (visually hidden, not display:none) */}
-              <input
-                ref={fileInputRef}
-                id="upload-dialog-file-input"
-                type="file"
-                multiple
-                accept={ACCEPT_ATTRIBUTE}
-                disabled={isUploading}
-                onChange={handleFileChange}
-                onInput={handleFileInput}
-                style={{ position: "fixed", top: "-9999px", left: "-9999px", width: "1px", height: "1px", opacity: 0 }}
-                aria-label="Choose files to upload"
-              />
               <Button
                 type="button"
                 variant="outline"
                 className="mt-2"
                 disabled={isUploading}
-                onClick={() => { setTimeout(() => { if (!isUploading) fileInputRef.current?.click(); }, 0); }}
+                onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Choose files
