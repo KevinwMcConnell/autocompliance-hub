@@ -229,8 +229,7 @@ export function UploadDialog({
 
       lastProcessedSelectionRef.current = { signature, at: Date.now() };
 
-      const queuedCount = addFiles(selected);
-      setLastQueuedCount(queuedCount);
+      addFiles(selected);
     },
     [addFiles]
   );
