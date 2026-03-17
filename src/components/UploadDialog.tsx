@@ -337,7 +337,6 @@ export function UploadDialog({
       return true;
     } catch (error: any) {
       console.error("Upload error:", error);
-      setLastErrorMessage(error?.message || "Upload failed");
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index
