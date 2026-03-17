@@ -85,11 +85,6 @@ export function UploadDialog({
   const [files, setFiles] = useState<FileWithStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [approvingIndex, setApprovingIndex] = useState<number | null>(null);
-  const [lastEventFired, setLastEventFired] = useState<"yes" | "no">("no");
-  const [lastSelectedCount, setLastSelectedCount] = useState(0);
-  const [lastQueuedCount, setLastQueuedCount] = useState(0);
-  const [lastErrorMessage, setLastErrorMessage] = useState("");
-  const showDebugPanel = import.meta.env.DEV;
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastProcessedSelectionRef = useRef<{ signature: string; at: number } | null>(null);
   // Avoid side-effects inside setState updaters; keep a lightweight ref of current queue length.
@@ -119,10 +114,6 @@ export function UploadDialog({
     setIsDragging(false);
     setIsUploading(false);
     setApprovingIndex(null);
-    setLastEventFired("no");
-    setLastSelectedCount(0);
-    setLastQueuedCount(0);
-    setLastErrorMessage("");
     resetFileInput();
   }, [resetFileInput]);
 
@@ -153,14 +144,12 @@ export function UploadDialog({
       if (file.size > MAX_FILE_SIZE_BYTES) {
         const message = `Rejected: ${file.name} | type: ${fileType} | size: ${file.size} bytes (${fileSize}) | reason: too large`;
         toast.error(message);
-        setLastErrorMessage(message);
         continue;
       }
 
       if (!isAcceptedFile(file)) {
         const message = `Rejected: ${file.name} | type: ${fileType} | size: ${file.size} bytes (${fileSize}) | reason: type not accepted`;
         toast.error(message);
-        setLastErrorMessage(message);
         continue;
       }
 
@@ -173,7 +162,6 @@ export function UploadDialog({
     if (remaining === 0) {
       const message = `You can queue up to ${MAX_FILES_PER_QUEUE} files at a time.`;
       toast.error(message);
-      setLastErrorMessage(message);
       return 0;
     }
 
@@ -186,7 +174,6 @@ export function UploadDialog({
     if (filesWithStatus.length > remaining) {
       const message = `Only the first ${remaining} file(s) were added (queue limit: ${MAX_FILES_PER_QUEUE}).`;
       toast.error(message);
-      setLastErrorMessage(message);
     }
 
     const toAdd = filesWithStatus.slice(0, remaining);
@@ -229,11 +216,6 @@ export function UploadDialog({
       const types = selected.map((f) => f.type || "no type detected");
       const sizes = selected.map((f) => f.size);
 
-      setLastEventFired("yes");
-      setLastSelectedCount(count);
-      setLastQueuedCount(0);
-      setLastErrorMessage("");
-
       console.log(`[UploadDialog] ${source} fired`, { count, names, types, sizes });
 
       const signature = selected
@@ -247,8 +229,7 @@ export function UploadDialog({
 
       lastProcessedSelectionRef.current = { signature, at: Date.now() };
 
-      const queuedCount = addFiles(selected);
-      setLastQueuedCount(queuedCount);
+      addFiles(selected);
     },
     [addFiles]
   );
@@ -287,7 +268,6 @@ export function UploadDialog({
 
     try {
       toast.info(`Uploading: ${file.name}`);
-      setLastErrorMessage("");
 
       setFiles((prev) =>
         prev.map((f, i) =>
@@ -305,7 +285,6 @@ export function UploadDialog({
       if (uploadError) {
         const message = `Storage upload failed: ${uploadError.message}`;
         toast.error(message);
-        setLastErrorMessage(message);
         throw uploadError;
       }
 
@@ -344,7 +323,6 @@ export function UploadDialog({
       if (insertError) {
         const message = `DB insert failed: ${insertError.message}`;
         toast.error(message);
-        setLastErrorMessage(message);
         throw insertError;
       }
 
@@ -359,7 +337,6 @@ export function UploadDialog({
       return true;
     } catch (error: any) {
       console.error("Upload error:", error);
-      setLastErrorMessage(error?.message || "Upload failed");
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index
@@ -541,7 +518,7 @@ export function UploadDialog({
                 variant="outline"
                 className="mt-2"
                 disabled={isUploading}
-                onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+                onClick={() => { setTimeout(() => { if (!isUploading) fileInputRef.current?.click(); }, 0); }}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Choose files
@@ -628,23 +605,6 @@ export function UploadDialog({
             </p>
           )}
 
-          {showDebugPanel && (
-            <div className="rounded-md border border-border bg-muted/40 p-3 space-y-1">
-              <p className="text-xs font-medium text-foreground">Upload debug</p>
-              <p className="text-xs text-muted-foreground">
-                lastEvent: onChange fired = {lastEventFired}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                lastSelectedCount: {lastSelectedCount}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                lastQueuedCount: {lastQueuedCount}
-              </p>
-              <p className="text-xs text-muted-foreground break-words">
-                lastErrorMessage: {lastErrorMessage || "none"}
-              </p>
-            </div>
-          )}
         </div>
 
         <DialogFooter>
