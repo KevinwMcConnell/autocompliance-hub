@@ -605,23 +605,6 @@ export function UploadDialog({
             </p>
           )}
 
-          {showDebugPanel && (
-            <div className="rounded-md border border-border bg-muted/40 p-3 space-y-1">
-              <p className="text-xs font-medium text-foreground">Upload debug</p>
-              <p className="text-xs text-muted-foreground">
-                lastEvent: onChange fired = {lastEventFired}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                lastSelectedCount: {lastSelectedCount}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                lastQueuedCount: {lastQueuedCount}
-              </p>
-              <p className="text-xs text-muted-foreground break-words">
-                lastErrorMessage: {lastErrorMessage || "none"}
-              </p>
-            </div>
-          )}
         </div>
 
         <DialogFooter>
