@@ -533,7 +533,7 @@ export function UploadDialog({
                 disabled={isUploading}
                 onChange={handleFileChange}
                 onInput={handleFileInput}
-                className="sr-only"
+                style={{ position: "fixed", top: "-9999px", left: "-9999px", width: "1px", height: "1px", opacity: 0 }}
                 aria-label="Choose files to upload"
               />
               <label
