@@ -636,5 +636,6 @@ export function UploadDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
