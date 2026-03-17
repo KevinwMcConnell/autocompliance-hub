@@ -323,7 +323,6 @@ export function UploadDialog({
       if (insertError) {
         const message = `DB insert failed: ${insertError.message}`;
         toast.error(message);
-        setLastErrorMessage(message);
         throw insertError;
       }
 
