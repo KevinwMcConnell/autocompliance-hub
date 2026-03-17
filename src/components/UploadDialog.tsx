@@ -268,7 +268,6 @@ export function UploadDialog({
 
     try {
       toast.info(`Uploading: ${file.name}`);
-      setLastErrorMessage("");
 
       setFiles((prev) =>
         prev.map((f, i) =>
