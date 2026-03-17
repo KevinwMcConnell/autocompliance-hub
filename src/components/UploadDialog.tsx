@@ -162,7 +162,6 @@ export function UploadDialog({
     if (remaining === 0) {
       const message = `You can queue up to ${MAX_FILES_PER_QUEUE} files at a time.`;
       toast.error(message);
-      setLastErrorMessage(message);
       return 0;
     }
 
@@ -175,7 +174,6 @@ export function UploadDialog({
     if (filesWithStatus.length > remaining) {
       const message = `Only the first ${remaining} file(s) were added (queue limit: ${MAX_FILES_PER_QUEUE}).`;
       toast.error(message);
-      setLastErrorMessage(message);
     }
 
     const toAdd = filesWithStatus.slice(0, remaining);
