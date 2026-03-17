@@ -285,7 +285,6 @@ export function UploadDialog({
       if (uploadError) {
         const message = `Storage upload failed: ${uploadError.message}`;
         toast.error(message);
-        setLastErrorMessage(message);
         throw uploadError;
       }
 
