@@ -239,17 +239,19 @@ export function UploadDialog({
   // Android fallback: when the file picker closes the window regains focus but
   // onChange/onInput may never fire. We read the input's files on focus instead.
   useEffect(() => {
-    const handleWindowFocus = () => {
+    const handleVisibility = () => {
       if (!pickerOpenRef.current) return;
+      if (document.visibilityState !== "visible") return;
       pickerOpenRef.current = false;
       setTimeout(() => {
-        if (fileInputRef.current && fileInputRef.current.files?.length) {
-          processPickedFiles(fileInputRef.current, "onWindowFocus");
-        }
-      }, 300);
+        const input = fileInputRef.current;
+        if (!input || !input.files || input.files.length === 0) return;
+        const selected = Array.from(input.files).slice(0, MAX_FILES_PER_QUEUE);
+        if (selected.length > 0) processPickedFiles(input, "onWindowFocus");
+      }, 500);
     };
-    window.addEventListener("focus", handleWindowFocus);
-    return () => window.removeEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [processPickedFiles]);
 
   const handleFileChange = useCallback(
