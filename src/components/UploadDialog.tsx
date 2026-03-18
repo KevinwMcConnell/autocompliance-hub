@@ -541,15 +541,23 @@ export function UploadDialog({
                   PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                 </p>
               </div>
+              {/* Use a label to activate the file input directly — programmatic
+                  .click() from a button is treated as a derived gesture on
+                  Android Chrome and often silently drops the change event. */}
               <Button
-                type="button"
+                asChild
                 variant="outline"
                 className="mt-2"
                 disabled={isUploading}
-                onClick={() => { if (!isUploading) { pickerOpenRef.current = true; fileInputRef.current?.click(); } }}
               >
-                <Upload className="h-4 w-4 mr-2" />
-                Choose files
+                <label
+                  htmlFor="upload-dialog-file-input"
+                  onClick={() => { pickerOpenRef.current = true; }}
+                  style={{ cursor: isUploading ? "not-allowed" : "pointer" }}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Choose files
+                </label>
               </Button>
             </div>
           </div>
