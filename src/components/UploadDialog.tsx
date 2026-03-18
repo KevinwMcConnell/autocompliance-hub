@@ -203,22 +203,6 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Android fallback: when the file picker closes the window regains focus but
-  // onChange/onInput may never fire. We read the input's files on focus instead.
-  useEffect(() => {
-    const handleWindowFocus = () => {
-      if (!pickerOpenRef.current) return;
-      pickerOpenRef.current = false;
-      setTimeout(() => {
-        if (fileInputRef.current && fileInputRef.current.files?.length) {
-          processPickedFiles(fileInputRef.current, "onWindowFocus");
-        }
-      }, 300);
-    };
-    window.addEventListener("focus", handleWindowFocus);
-    return () => window.removeEventListener("focus", handleWindowFocus);
-  }, [processPickedFiles]);
-
   // Shared file processing used by both onChange and onInput for mobile browser resilience
   const processPickedFiles = useCallback(
     (input: HTMLInputElement, source: "onChange" | "onInput" | "onWindowFocus") => {
@@ -251,6 +235,22 @@ export function UploadDialog({
     },
     [addFiles]
   );
+
+  // Android fallback: when the file picker closes the window regains focus but
+  // onChange/onInput may never fire. We read the input's files on focus instead.
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (!pickerOpenRef.current) return;
+      pickerOpenRef.current = false;
+      setTimeout(() => {
+        if (fileInputRef.current && fileInputRef.current.files?.length) {
+          processPickedFiles(fileInputRef.current, "onWindowFocus");
+        }
+      }, 300);
+    };
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, [processPickedFiles]);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
