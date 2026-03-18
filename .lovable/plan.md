@@ -1,78 +1,64 @@
 
+I checked the current `src/components/UploadDialog.tsx` and the requested two changes are well scoped.
 
-## Clean Up Navigation and First-Use Flow
+What’s going on
+- The current implementation already moved the file input outside the dialog and made it invisible-but-rendered, which is the right general direction for Android.
+- But it still relies on `window.focus` to detect picker return. On some Android/tablet browsers, the file picker lifecycle does not reliably restore focus in a way that triggers this handler.
+- That means the picker may open, but the selected file never gets processed into the queue.
+- Your requested replacement to `visibilitychange` is a sensible next step because mobile browsers often toggle document visibility when the native picker opens/closes, even when focus behavior is inconsistent.
 
-A focused set of changes to make the workflow obvious: Dashboard -> Upload -> Evidence -> Tasks -> Exports. No schema changes, no logic changes, no routing changes beyond sidebar order.
+Planned changes
+1. Update the hidden file input style only
+   - Replace the current invisible absolute style:
+     ```ts
+     style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', pointerEvents: 'none', top: 0, left: 0 }}
+     ```
+   - With the exact off-screen fixed style you provided:
+     ```ts
+     style={{ position: 'fixed', top: '-100px', left: '-100px', width: '1px', height: '1px', opacity: 0 }}
+     ```
+   - This keeps the input rendered in the DOM while avoiding some browser quirks around zero-visibility clickable targets.
 
-### Files to modify
+2. Replace the picker return detection effect exactly as requested
+   - Remove the entire current `useEffect` that attaches:
+     ```ts
+     window.addEventListener("focus", handleWindowFocus)
+     ```
+   - Replace it with your `visibilitychange`-based effect exactly.
+   - This will:
+     - wait until the document becomes visible again
+     - confirm the picker was actually opened via `pickerOpenRef`
+     - check whether files exist on the input
+     - pass the input back into existing `processPickedFiles(...)`
+   - No other logic or state needs to change.
 
-1. **`src/components/AppSidebar.tsx`** -- Reorder sidebar nav
-2. **`src/pages/Dashboard.tsx`** -- Restructure CTAs and conditionally de-emphasize Export
-3. **`src/pages/EvidenceMap.tsx`** -- Improve empty state and descriptive wording
-4. **`src/pages/Tasks.tsx`** -- Improve empty state wording
-5. **`src/pages/Exports.tsx`** -- Improve empty state and de-emphasize when not ready
+Why this is likely the right next fix
+- The current failure is most likely in the “picker returned but event recovery never ran” path, not in the queueing logic itself.
+- `processPickedFiles`, dedupe handling, `onChange`, `onInput`, and queue insertion all look intact from the current file.
+- So changing the hidden input positioning plus using `visibilitychange` targets the two places most likely to differ across Android Chrome / Samsung Browser / tablet webviews.
 
----
+Technical notes
+- I would not change:
+  - the synchronous `fileInputRef.current?.click()`
+  - `pickerOpenRef.current = true`
+  - `onChange` / `onInput`
+  - queueing logic
+  - dialog structure
+- The current file order is also important: `processPickedFiles` is declared before the effect, so replacing the effect should not reintroduce the earlier runtime initialization bug.
 
-### 1. Sidebar order (`AppSidebar.tsx`)
+Expected result after implementation
+- Input remains invisible but still mounted in the DOM
+- Android browsers have a better chance of both opening the picker and processing the selected file
+- Desktop click-to-upload should remain unchanged
+- Drag-and-drop remains unchanged
 
-Reorder the `navigation` array to match the workflow:
+Limits / reality check
+- If this still fails specifically inside an embedded preview/webview, the problem may be browser-container restrictions rather than React logic.
+- The best signal will be testing in the standalone preview URL in Android Chrome or Samsung Browser, not the in-app preview container.
 
-```text
-Dashboard  ->  Upload Inbox  ->  Evidence Map  ->  Tasks  ->  Exports  ->  Settings
-```
-
-Currently Evidence Map comes before Upload Inbox. Swap them.
-
----
-
-### 2. Dashboard CTAs (`Dashboard.tsx`)
-
-**Current**: Two equal buttons -- "Upload Documents" (outline) and "Export Packet" (primary). Export feels like a first action.
-
-**Change**:
-- Make "Upload Documents" the primary CTA (filled button, listed first).
-- Add "View Evidence Map" as a secondary outline button.
-- Show "Export Packet" only when there are approved evidence items (`okEvidence > 0`). When no approved evidence exists, omit the Export button entirely from the header.
-- Remove the duplicate "Quick Upload" dashed card in the middle row -- it competes with the header CTA and the Upload Inbox page. Replace it with a simple info card that says "Next step: Upload your compliance documents to get started" when there are zero documents, or show due-soon summary when data exists.
-
----
-
-### 3. Evidence Map wording (`EvidenceMap.tsx`)
-
-**Empty state**: Change subtitle from "Track all compliance documents and their status" to "Track required compliance items and attach uploaded documents to them."
-
-**"Add Evidence Item" button**: Change label to "Add Compliance Requirement" so first-time users understand they are creating a requirement to track, not uploading a file.
-
-**Empty state body**: Change from "Upload compliance documents or create an evidence item to start tracking your requirements" to:
-- Primary CTA: "Upload Documents" (links to Upload Inbox)
-- Secondary CTA: "Add Compliance Requirement" -- with helper text: "Create a compliance requirement to track, then attach uploaded documents to it."
-
----
-
-### 4. Tasks empty state (`Tasks.tsx`)
-
-**Change** the empty state copy from "Add a task to start tracking your compliance requirements" to "Create tasks for compliance work that needs to get done -- inspections, renewals, follow-ups."
-
-Button text stays "Add Your First Task".
-
----
-
-### 5. Exports page (`Exports.tsx`)
-
-**When evidence items exist but none are "ok"**: Currently shows the full export UI with 0 items selected and the export button disabled. Add a prominent banner at the top explaining: "Your inspection packet isn't ready yet. Upload and approve documents, then attach them to evidence items to include them in your export."
-
-**Empty state** (no evidence items): Already good -- links to Upload Inbox. No change needed.
-
----
-
-### Summary of improvements
-
-- **Sidebar order** matches real workflow (Upload before Evidence).
-- **Dashboard** makes Upload the obvious first action; Export is hidden until relevant.
-- **Duplicate upload card** on Dashboard replaced with contextual guidance.
-- **Evidence Map** clarifies the distinction between uploading a file vs. creating a requirement.
-- **Tasks** has clearer empty-state guidance.
-- **Exports** explains why it's not ready when no approved evidence exists.
-- Zero functionality removed. Zero schema changes. Zero routing changes.
-
+Implementation scope
+- Exactly 2 code edits in `src/components/UploadDialog.tsx`
+- No refactor
+- No state changes
+- No extra UI changes
+- No backend changes
