@@ -203,22 +203,6 @@ export function UploadDialog({
     [addFiles]
   );
 
-  // Android fallback: when the file picker closes the window regains focus but
-  // onChange/onInput may never fire. We read the input's files on focus instead.
-  useEffect(() => {
-    const handleWindowFocus = () => {
-      if (!pickerOpenRef.current) return;
-      pickerOpenRef.current = false;
-      setTimeout(() => {
-        if (fileInputRef.current && fileInputRef.current.files?.length) {
-          processPickedFiles(fileInputRef.current, "onWindowFocus");
-        }
-      }, 300);
-    };
-    window.addEventListener("focus", handleWindowFocus);
-    return () => window.removeEventListener("focus", handleWindowFocus);
-  }, [processPickedFiles]);
-
   // Shared file processing used by both onChange and onInput for mobile browser resilience
   const processPickedFiles = useCallback(
     (input: HTMLInputElement, source: "onChange" | "onInput" | "onWindowFocus") => {
@@ -251,6 +235,32 @@ export function UploadDialog({
     },
     [addFiles]
   );
+
+  // Android fallback: the native file picker runs as a separate Activity.
+  // When it closes, the browser tab transitions from hidden -> visible
+  // (visibilitychange), NOT a window focus event. We read input.files
+  // after a 300 ms delay to give Chrome time to populate the FileList.
+  // window "focus" is kept as a belt-and-suspenders fallback for other browsers.
+  useEffect(() => {
+    const tryReadFiles = () => {
+      if (!pickerOpenRef.current) return;
+      pickerOpenRef.current = false;
+      setTimeout(() => {
+        if (fileInputRef.current && fileInputRef.current.files?.length) {
+          processPickedFiles(fileInputRef.current, "onWindowFocus");
+        }
+      }, 300);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") tryReadFiles();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", tryReadFiles);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", tryReadFiles);
+    };
+  }, [processPickedFiles]);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
