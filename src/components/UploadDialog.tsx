@@ -95,6 +95,8 @@ export function UploadDialog({
 
   // Ref to file input for resetting value
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Android: track when the picker was opened so the window-focus fallback can read files
+  const pickerOpenRef = useRef(false);
 
   // Reset file input value - critical for allowing same file to be selected again
   const resetFileInput = useCallback(() => {
@@ -201,9 +203,25 @@ export function UploadDialog({
     [addFiles]
   );
 
+  // Android fallback: when the file picker closes the window regains focus but
+  // onChange/onInput may never fire. We read the input's files on focus instead.
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (!pickerOpenRef.current) return;
+      pickerOpenRef.current = false;
+      setTimeout(() => {
+        if (fileInputRef.current && fileInputRef.current.files?.length) {
+          processPickedFiles(fileInputRef.current, "onWindowFocus");
+        }
+      }, 300);
+    };
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, [processPickedFiles]);
+
   // Shared file processing used by both onChange and onInput for mobile browser resilience
   const processPickedFiles = useCallback(
-    (input: HTMLInputElement, source: "onChange" | "onInput") => {
+    (input: HTMLInputElement, source: "onChange" | "onInput" | "onWindowFocus") => {
       const selected = Array.from(input.files || []).slice(0, MAX_FILES_PER_QUEUE);
       input.value = "";
 
@@ -518,7 +536,7 @@ export function UploadDialog({
                 variant="outline"
                 className="mt-2"
                 disabled={isUploading}
-                onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+                onClick={() => { if (!isUploading) { pickerOpenRef.current = true; fileInputRef.current?.click(); } }}
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Choose files
