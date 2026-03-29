@@ -470,6 +470,19 @@ export function UploadDialog({
 
   return (
     <>
+      {/* File input OUTSIDE the Radix Dialog to avoid focus-trap/event interception on mobile */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={ACCEPT_ATTRIBUTE}
+        disabled={isUploading}
+        onChange={handleFileChange}
+        onInput={handleFileInput}
+        style={{ position: 'fixed', top: '-9999px', left: '-9999px', opacity: 0 }}
+        aria-label="Choose files to upload"
+        tabIndex={-1}
+      />
       <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
