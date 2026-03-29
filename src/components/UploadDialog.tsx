@@ -538,7 +538,7 @@ export function UploadDialog({
                   onChange={handleFileChange}
                   onInput={handleFileInput}
                   onClick={() => { pickerOpenRef.current = true; }}
-                  className="hidden"
+                  style={{ position: 'absolute', left: '-9999px', top: 'auto', width: '1px', height: '1px', opacity: 0 }}
                   aria-label="Choose files to upload"
                 />
               </label>
