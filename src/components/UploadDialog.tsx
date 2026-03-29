@@ -521,27 +521,24 @@ export function UploadDialog({
                   PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                 </p>
               </div>
-              <label
-                onClick={() => { pickerOpenRef.current = true; }}
-                className={cn(
-                  "relative mt-2 inline-flex items-center justify-center gap-2 overflow-hidden rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors",
-                  isUploading && "pointer-events-none opacity-50"
-                )}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isUploading}
+                className="mt-2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  pickerOpenRef.current = true;
+                  // Use setTimeout to escape Radix Dialog's event handling
+                  setTimeout(() => {
+                    fileInputRef.current?.click();
+                  }, 100);
+                }}
               >
                 <Upload className="h-4 w-4" />
                 Choose files
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept={ACCEPT_ATTRIBUTE}
-                  disabled={isUploading}
-                  onChange={handleFileChange}
-                  onInput={handleFileInput}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-                  aria-label="Choose files to upload"
-                />
-              </label>
+              </Button>
             </div>
           </div>
 
