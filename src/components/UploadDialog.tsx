@@ -479,7 +479,7 @@ export function UploadDialog({
         disabled={isUploading}
         onChange={handleFileChange}
         onInput={handleFileInput}
-        style={{ position: 'fixed', top: '-100px', left: '-100px', width: '1px', height: '1px', opacity: 0 }}
+        style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}
         aria-label="Choose files to upload"
       />
       <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -533,16 +533,17 @@ export function UploadDialog({
                   PDF, JPG, PNG, HEIC, DOCX, XLSX, ZIP (max 20MB)
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-2"
-                disabled={isUploading}
-                onClick={() => { if (!isUploading) { pickerOpenRef.current = true; fileInputRef.current?.click(); } }}
+              <label
+                htmlFor="upload-dialog-file-input"
+                className={cn(
+                  "mt-2 inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors",
+                  isUploading && "pointer-events-none opacity-50"
+                )}
+                onClick={() => { pickerOpenRef.current = true; }}
               >
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className="h-4 w-4" />
                 Choose files
-              </Button>
+              </label>
             </div>
           </div>
 
