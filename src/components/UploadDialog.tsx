@@ -524,7 +524,7 @@ export function UploadDialog({
               <label
                 onClick={() => { pickerOpenRef.current = true; }}
                 className={cn(
-                  "mt-2 inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors",
+                  "relative mt-2 inline-flex items-center justify-center gap-2 overflow-hidden rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors",
                   isUploading && "pointer-events-none opacity-50"
                 )}
               >
@@ -538,7 +538,7 @@ export function UploadDialog({
                   disabled={isUploading}
                   onChange={handleFileChange}
                   onInput={handleFileInput}
-                  style={{ position: 'absolute', left: '-9999px', top: 'auto', width: '1px', height: '1px', opacity: 0 }}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                   aria-label="Choose files to upload"
                 />
               </label>
